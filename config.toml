@@ -1,0 +1,41 @@
+# OpenShelf 設定檔。所有路徑相對於本檔所在目錄；未列出的項目使用內建預設值。
+
+# 下載的電子書與 .acsm 存放處
+output_dir = "output"
+
+# 瀏覽器登入態（Playwright 持久化 profile）目錄；切勿提交版控
+profile_dir = ".profile"
+
+# 登入態快照（cookies）檔；切勿提交版控
+storage_state = "storage_state.json"
+
+# 無 DRM 書偏好格式："epub" 或 "pdf"（無偏好格式時自動退回另一種）
+prefer_format = "epub"
+
+# 是否抓取 DRM 書的 .acsm（false 則 DRM 書只記錄不下載）
+include_acsm = true
+
+# 每本之間的間隔秒數（節流，避免過快觸發風控）
+throttle_seconds = 2.0
+
+# 單本下載逾時秒數
+download_timeout = 120
+
+# 單本下載失敗時的重試次數（網路錯誤／5xx 才重試，401/403 與覆核失敗不重試）
+download_retries = 3
+
+# .acsm 視為有效的天數（以「下載時間」為準的時效代理；逾期會在報表標示、
+# 可用 `openshelf export --refresh-acsm` 重抓）。
+# 注意：本工具不解析 .acsm 內容，無法得知 Adobe 憑證真正的到期時間，
+# 此處僅以我們自己的下載時間 + 天數做提醒。
+acsm_valid_days = 7
+
+# Calibre 64-bit 交接設定。留空時會自動尋找 PATH 與常見安裝位置。
+# 本功能只匯入已下載的無 DRM EPUB/PDF，不處理 .acsm。
+calibredb_path = ""
+
+# 指定 Calibre 書庫路徑；留空時使用 Calibre 目前預設書庫。
+calibre_library = ""
+
+# ADE 執行檔路徑；留空時會找常見安裝位置，找不到則使用系統預設程式開啟 EPUB/PDF。
+ade_path = ""

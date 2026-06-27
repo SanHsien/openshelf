@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全使用與專案邊界
+    url: https://github.com/SanHsien/openshelf/blob/main/docs/third-party-ebook-tooling.md
+    about: 關於 .acsm、ADE、Calibre 與「為什麼 OpenShelf 不做 DRM 移除」的背景說明。
+  - name: 合理使用與授權
+    url: https://github.com/SanHsien/openshelf/blob/main/NOTICE.md
+    about: OpenShelf 僅供匯出你自己合法擁有的書；不解析 ACSM、不抽金鑰、不移除任何保護。
