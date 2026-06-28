@@ -108,6 +108,15 @@ A DRM book downloads as an `.acsm`, **not the book itself**. To read it (done on
 
 If ADE shows `E_ADEPT_REQUEST_EXPIRED`, the `.acsm` fulfillment token has expired. Re-download the official `.acsm` first: in the desktop app, enable **Force re-fetch .acsm** and click Download; in the CLI, run `openshelf export --force-refresh-acsm`, then open the new `.acsm` with ADE.
 
+`.acsm` re-fetch options:
+
+| Option | CLI | Use case |
+|---|---|---|
+| **Re-fetch stale .acsm** | `openshelf export --refresh-acsm` | Re-download only `.acsm` files that OpenShelf considers stale based on download time + `acsm_valid_days`. Use this for routine cleanup. |
+| **Force re-fetch .acsm** | `openshelf export --force-refresh-acsm` | Ignore validity days and re-download every already-downloaded `.acsm`. Use this when ADE shows `E_ADEPT_REQUEST_EXPIRED`. |
+
+OpenShelf does not parse `.acsm`, so it does not know Adobe's actual fulfillment expiry; `acsm_valid_days` is only a reminder proxy.
+
 ## 📂 Output & manifest
 
 - Ebooks and `.acsm` → `output/` (configurable in `config.toml`).
