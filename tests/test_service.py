@@ -15,6 +15,7 @@ from openshelf.service import (
     _disambiguator,
     _is_stale_acsm,
     _should_refresh_acsm,
+    _should_skip_opened_acsm_refresh,
     count_stale_acsm,
     write_csv,
     write_html,
@@ -119,6 +120,16 @@ class AcsmStaleness(unittest.TestCase):
         old = self._entry(10)
         self.assertFalse(_should_refresh_acsm(fresh, _cfg(7), True, False))
         self.assertTrue(_should_refresh_acsm(old, _cfg(7), True, False))
+
+    def test_force_refresh_skips_opened_acsm_for_next_batch(self):
+        entry = self._entry(1)
+        entry.acsm_opened_at = "2026-06-29T00:00:00+00:00"
+        self.assertTrue(_should_skip_opened_acsm_refresh(entry, True))
+        self.assertFalse(_should_skip_opened_acsm_refresh(entry, False))
+
+    def test_force_refresh_does_not_skip_unopened_acsm(self):
+        entry = self._entry(1)
+        self.assertFalse(_should_skip_opened_acsm_refresh(entry, True))
 
 
 class Report(unittest.TestCase):

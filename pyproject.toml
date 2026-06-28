@@ -1,6 +1,6 @@
 [project]
 name = "openshelf"
-version = "1.0.2"
+version = "1.0.3"
 description = "枚舉並批次匯出 Google Play 圖書：無 DRM 書下載 EPUB/PDF，DRM 書下載官方 .acsm 供 Adobe Digital Editions 閱讀。"
 readme = "README.md"
 requires-python = ">=3.11"

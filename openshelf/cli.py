@@ -235,15 +235,28 @@ def ebook_report(ctx: click.Context, target: str) -> None:
 
 @main.command("acsm-open", help="批次用系統預設程式開啟已下載的 .acsm。")
 @click.option("--dry-run", is_flag=True, help="只列出可交接數量，不開啟檔案。")
+@click.option("--limit", type=int, default=None, help="最多開啟幾個 .acsm（建議分批交接 ADE）。")
+@click.option("--include-opened", is_flag=True, help="包含先前已送出給 ADE / 系統預設程式的 .acsm。")
 @click.pass_context
-def acsm_open(ctx: click.Context, dry_run: bool) -> None:
+def acsm_open(
+    ctx: click.Context,
+    dry_run: bool,
+    limit: int | None,
+    include_opened: bool,
+) -> None:
     cfg = ctx.obj["config"]
     manifest = Manifest.load(cfg.manifest_path)
     if not manifest.books:
         raise click.ClickException("manifest 為空，請先執行：openshelf scan")
 
     try:
-        result = acsm.open_acsm(cfg, manifest, dry_run=dry_run)
+        result = acsm.open_acsm(
+            cfg,
+            manifest,
+            dry_run=dry_run,
+            limit=limit,
+            include_opened=include_opened,
+        )
     except subprocess.CalledProcessError as e:
         raise click.ClickException(f"ACSM 交接失敗（exit {e.returncode}）。")
     except OSError as e:
@@ -252,8 +265,10 @@ def acsm_open(ctx: click.Context, dry_run: bool) -> None:
     report_path = acsm.write_report(manifest, cfg)
     plan = result.plan
     if dry_run:
+        batch = min(limit, len(plan.openable)) if limit and limit > 0 else len(plan.openable)
         console.print(
-            f"可交接 {len(plan.openable)} 本、檔案遺失 {len(plan.missing)} 本。"
+            f"本批可交接 {batch} 本、尚未交接 {len(plan.openable)} 本、"
+            f"已送出 {len(plan.already_opened)} 本、檔案遺失 {len(plan.missing)} 本。"
         )
     else:
         console.print(f"[green]已送出 .acsm：[/green]{result.opened} 本")

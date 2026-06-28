@@ -89,7 +89,7 @@ openshelf status    # 4) see the stats
 | `openshelf status` | Show manifest stats and refresh the download report |
 | `openshelf report` | Write reports to the output folder — `--format txt\|csv\|html\|all` |
 | `openshelf doctor` | Endpoint health check: confirm Google's backend response shape still matches |
-| `openshelf acsm-open` / `acsm-report` | Batch-open downloaded `.acsm` with the default app / write report |
+| `openshelf acsm-open` / `acsm-report` | Batch-open downloaded `.acsm` with the default app / write report (`--limit`, `--include-opened`) |
 | `openshelf ebook-open` / `ebook-report` | Open downloaded DRM-free EPUB/PDF (`--target ade\|default`) / write report |
 | `openshelf calibre-import` / `calibre-report` | Import DRM-free EPUB/PDF into Calibre / write report |
 | `openshelf ui` | Open the desktop GUI (needs `pip install -e '.[gui]'`) |
@@ -108,12 +108,18 @@ A DRM book downloads as an `.acsm`, **not the book itself**. To read it (done on
 
 If ADE shows `E_ADEPT_REQUEST_EXPIRED`, the `.acsm` fulfillment token has expired. Re-download the official `.acsm` first: in the desktop app, enable **Force re-fetch .acsm** and click Download; in the CLI, run `openshelf export --force-refresh-acsm`, then open the new `.acsm` with ADE.
 
+Do not hand a large `.acsm` library to ADE all at once. ADE queues them, and later tokens may expire while waiting. Use batches instead:
+
+1. Desktop app: set **Batch** to 20-30, enable **Force re-fetch .acsm**, click Download, then click Open ACSM. Wait for ADE to finish the batch and repeat.
+2. CLI: run `openshelf export --force-refresh-acsm --limit 25`, then `openshelf acsm-open --limit 25`. Wait for ADE to finish the batch and repeat.
+3. OpenShelf only records "handed off to ADE / the default app"; it cannot know whether ADE successfully imported the book. If ADE fails immediately, enable **Include sent** in the desktop app or pass `--include-opened` in the CLI to resend that batch.
+
 `.acsm` re-fetch options:
 
 | Option | CLI | Use case |
 |---|---|---|
 | **Re-fetch stale .acsm** | `openshelf export --refresh-acsm` | Re-download only `.acsm` files that OpenShelf considers stale based on download time + `acsm_valid_days`. Use this for routine cleanup. |
-| **Force re-fetch .acsm** | `openshelf export --force-refresh-acsm` | Ignore validity days and re-download every already-downloaded `.acsm`. Use this when ADE shows `E_ADEPT_REQUEST_EXPIRED`. |
+| **Force re-fetch .acsm** | `openshelf export --force-refresh-acsm` | Ignore validity days and re-download already-downloaded `.acsm` files that have not yet been handed off to ADE. Use this when ADE shows `E_ADEPT_REQUEST_EXPIRED`; pair it with `--limit 25` for batches. |
 
 OpenShelf does not parse `.acsm`, so it does not know Adobe's actual fulfillment expiry; `acsm_valid_days` is only a reminder proxy.
 
@@ -128,7 +134,7 @@ OpenShelf does not parse `.acsm`, so it does not know Adobe's actual fulfillment
 
 ## 🛣️ Roadmap
 
-Completed: M1–M11 through **v1.0.2** (sign-in, endpoint discovery, classification, HTTP download, retries/verification, desktop GUI, PyInstaller packaging, handoffs/reports/CI, desktop UX, releases, endpoint self-diagnosis, integration tests, structured logs, and cross-platform CI builds). Windows release artifacts have been locally smoke-tested; macOS and Linux artifacts are CI-built only and have not been tested on those platforms. See the [Chinese README](README.md#️-開發路線) for the detailed roadmap.
+Completed: M1–M11 through **v1.0.3** (sign-in, endpoint discovery, classification, HTTP download, retries/verification, desktop GUI, PyInstaller packaging, handoffs/reports/CI, desktop UX, ACSM batch handoff, releases, endpoint self-diagnosis, integration tests, structured logs, and cross-platform CI builds). Windows release artifacts have been locally smoke-tested; macOS and Linux artifacts are CI-built only and have not been tested on those platforms. See the [Chinese README](README.md#️-開發路線) for the detailed roadmap.
 
 **Never**: DRM circumvention/decryption/stripping, `.acsm` parsing, fulfilling outside ADE, key extraction.
 

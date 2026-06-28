@@ -63,6 +63,37 @@ class AcsmPlanTest(unittest.TestCase):
 
         self.assertEqual(result.opened, 1)
         self.assertEqual(opened, [self.dir / "ok.acsm"])
+        self.assertTrue(self.manifest.books["A"].acsm_opened_at)
+
+    def test_open_limit_and_skip_opened_by_default(self):
+        (self.dir / "ok2.acsm").write_bytes(b"<fulfillmentToken/>")
+        self.manifest.books["E"] = _book("E", "acsm", "ok2.acsm")
+        opened = []
+
+        def opener(path):
+            opened.append(path)
+
+        first = open_acsm(_cfg(self.dir), self.manifest, limit=1, opener=opener)
+        self.assertEqual(first.opened, 1)
+        self.assertEqual(opened, [self.dir / "ok.acsm"])
+
+        second = open_acsm(_cfg(self.dir), self.manifest, limit=1, opener=opener)
+        self.assertEqual(second.opened, 1)
+        self.assertEqual(opened, [self.dir / "ok.acsm", self.dir / "ok2.acsm"])
+
+    def test_include_opened_reopens_previous_handoff(self):
+        self.manifest.books["A"].acsm_opened_at = "2026-06-29T00:00:00+00:00"
+        opened = []
+
+        result = open_acsm(
+            _cfg(self.dir),
+            self.manifest,
+            include_opened=True,
+            opener=lambda path: opened.append(path),
+        )
+
+        self.assertEqual(result.opened, 1)
+        self.assertEqual(opened, [self.dir / "ok.acsm"])
 
     def test_dry_run_does_not_open(self):
         opened = []

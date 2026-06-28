@@ -121,6 +121,18 @@ def _should_refresh_acsm(
     return force_refresh_acsm or (refresh_acsm and _is_stale_acsm(entry, cfg))
 
 
+def _should_skip_opened_acsm_refresh(
+    entry: BookEntry,
+    force_refresh_acsm: bool,
+) -> bool:
+    """強制重抓分批處理時，已送出給 ADE 的 .acsm 不再佔下一批名額。"""
+    return (
+        force_refresh_acsm
+        and entry.category == "acsm"
+        and bool(entry.acsm_opened_at)
+    )
+
+
 def count_stale_acsm(manifest: Manifest, cfg: Config) -> int:
     """已下載但逾時、建議重抓的 .acsm 本數。"""
     return sum(
@@ -411,6 +423,9 @@ def export(
             if eff == "acsm" and not include_acsm:
                 continue
             if manifest.is_downloaded(vid, cfg.output_dir):
+                if _should_skip_opened_acsm_refresh(entry, force_refresh_acsm):
+                    result.skipped += 1
+                    continue
                 # 已下載；逾時或強制指定的 .acsm 才重抓，其餘跳過
                 if _should_refresh_acsm(entry, cfg, refresh_acsm, force_refresh_acsm):
                     reason = "強制重抓" if force_refresh_acsm else "逾時重抓"
@@ -449,6 +464,8 @@ def export(
                 entry.category = eff
                 entry.file_path = filename
                 entry.downloaded_at = now_iso()
+                if eff == "acsm":
+                    entry.acsm_opened_at = ""
                 entry.note = ""
                 manifest.upsert(entry)
                 manifest.save()

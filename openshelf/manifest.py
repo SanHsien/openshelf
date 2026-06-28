@@ -39,6 +39,7 @@ class BookEntry:
     category: str = "pending"
     file_path: str | None = None  # 相對 output_dir 的下載檔名
     downloaded_at: str = ""  # 實際下載時間（.acsm 時效判斷用）
+    acsm_opened_at: str = ""  # 送交 ADE / 系統預設程式的時間；非 ADE 成功匯入確認
     note: str = ""
     updated_at: str = field(default_factory=_now)
 

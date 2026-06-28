@@ -48,6 +48,7 @@ try:
         QPlainTextEdit,
         QProgressBar,
         QPushButton,
+        QSpinBox,
         QTableWidget,
         QTableWidgetItem,
         QTabWidget,
@@ -186,6 +187,12 @@ class MainWindow(QMainWindow):
         self.btn_acsm_preview = QPushButton(tr("檢查ACSM"))
         self.btn_acsm_open = QPushButton(tr("開啟ACSM"))
         self.btn_acsm_report = QPushButton(tr("ACSM報表"))
+        self.acsm_batch = QSpinBox()
+        self.acsm_batch.setRange(1, 999)
+        self.acsm_batch.setValue(25)
+        self.acsm_batch.setToolTip(
+            tr("一次送給 ADE 的 .acsm 數量；建議分批處理，避免憑證排隊過期")
+        )
         self.btn_refresh = QPushButton(tr("重新整理"))
         self.btn_report = QPushButton(tr("匯出CSV/HTML"))
         self.btn_report.setToolTip(tr("把書庫清單匯出為 CSV 與 HTML 報表並開啟資料夾"))
@@ -200,6 +207,10 @@ class MainWindow(QMainWindow):
         self.chk_force_refresh = QCheckBox(tr("強制重抓 .acsm"))
         self.chk_force_refresh.setToolTip(
             tr("ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證")
+        )
+        self.chk_include_opened_acsm = QCheckBox(tr("包含已送出"))
+        self.chk_include_opened_acsm.setToolTip(
+            tr("ADE 當場失敗時使用：重新送出先前已交接的 .acsm")
         )
         self.chk_skipfail = QCheckBox(tr("略過已知失敗"))
         self.filter_combo = QComboBox()
@@ -230,6 +241,7 @@ class MainWindow(QMainWindow):
         # 需在切換語言時重新轉譯的內嵌標籤
         self.lbl_drmfmt = QLabel(tr("無 DRM 格式"))
         self.lbl_target = QLabel(tr("目標"))
+        self.lbl_acsm_batch = QLabel(tr("批次"))
         self.lbl_search = QLabel(tr("搜尋"))
         self.lbl_filter = QLabel(tr("篩選"))
         self.lbl_lang = QLabel(tr("語言"))
@@ -267,6 +279,9 @@ class MainWindow(QMainWindow):
 
         acsm_tab = QWidget()
         acsm_bar = QHBoxLayout()
+        acsm_bar.addWidget(self.lbl_acsm_batch)
+        acsm_bar.addWidget(self.acsm_batch)
+        acsm_bar.addWidget(self.chk_include_opened_acsm)
         for w in (self.btn_acsm_preview, self.btn_acsm_open, self.btn_acsm_report):
             acsm_bar.addWidget(w)
         acsm_bar.addStretch(1)
@@ -695,6 +710,7 @@ class MainWindow(QMainWindow):
         refresh_acsm = self.chk_refresh.isChecked()
         force_refresh_acsm = self.chk_force_refresh.isChecked()
         skip_failed = self.chk_skipfail.isChecked()
+        limit = self.acsm_batch.value() if force_refresh_acsm else None
         self._run(
             lambda w: service.export(
                 cfg,
@@ -704,6 +720,7 @@ class MainWindow(QMainWindow):
                 progress=w.progress.emit,
                 status=w.status.emit,
                 should_stop=w.should_stop,
+                limit=limit,
                 refresh_acsm=refresh_acsm,
                 force_refresh_acsm=force_refresh_acsm,
                 skip_failed=skip_failed,
@@ -791,16 +808,26 @@ class MainWindow(QMainWindow):
 
     def on_acsm_preview(self) -> None:
         cfg = self.cfg
+        limit = self.acsm_batch.value()
+        include_opened = self.chk_include_opened_acsm.isChecked()
 
         def task(w):
             manifest = Manifest.load(cfg.manifest_path)
             if not manifest.books:
                 raise RuntimeError("manifest 為空，請先掃描書庫。")
-            result = acsm.open_acsm(cfg, manifest, dry_run=True)
+            result = acsm.open_acsm(
+                cfg,
+                manifest,
+                dry_run=True,
+                limit=limit,
+                include_opened=include_opened,
+            )
             path = acsm.write_report(manifest, cfg)
             plan = result.plan
+            batch = min(limit, len(plan.openable))
             w.log.emit(
-                f"可交接 {len(plan.openable)} 本、檔案遺失 {len(plan.missing)} 本。"
+                f"本批可交接 {batch} 本、尚未交接 {len(plan.openable)} 本、"
+                f"已送出 {len(plan.already_opened)} 本、檔案遺失 {len(plan.missing)} 本。"
             )
             w.log.emit(f"ACSM 交接報表：{path}")
             return result
@@ -809,18 +836,26 @@ class MainWindow(QMainWindow):
 
     def on_acsm_open(self) -> None:
         cfg = self.cfg
+        limit = self.acsm_batch.value()
+        include_opened = self.chk_include_opened_acsm.isChecked()
 
         def task(w):
             manifest = Manifest.load(cfg.manifest_path)
             if not manifest.books:
                 raise RuntimeError("manifest 為空，請先掃描書庫。")
             try:
-                result = acsm.open_acsm(cfg, manifest)
+                result = acsm.open_acsm(
+                    cfg,
+                    manifest,
+                    limit=limit,
+                    include_opened=include_opened,
+                )
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"ACSM 交接失敗（exit {e.returncode}）。") from e
             except OSError as e:
                 raise RuntimeError(f"ACSM 交接失敗：{e}") from e
             path = acsm.write_report(manifest, cfg)
+            w.log.emit(f"已送出本批 ACSM：{result.opened} 本。")
             w.log.emit(f"ACSM 交接報表：{path}")
             return result
 
@@ -975,6 +1010,10 @@ class MainWindow(QMainWindow):
         self.chk_force_refresh.setToolTip(
             tr("ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證")
         )
+        self.chk_include_opened_acsm.setText(tr("包含已送出"))
+        self.chk_include_opened_acsm.setToolTip(
+            tr("ADE 當場失敗時使用：重新送出先前已交接的 .acsm")
+        )
         self.chk_skipfail.setText(tr("略過已知失敗"))
         self.chk_cover.setText(tr("顯示封面"))
         self.chk_cover.setToolTip(
@@ -982,6 +1021,10 @@ class MainWindow(QMainWindow):
         )
         self.lbl_drmfmt.setText(tr("無 DRM 格式"))
         self.lbl_target.setText(tr("目標"))
+        self.lbl_acsm_batch.setText(tr("批次"))
+        self.acsm_batch.setToolTip(
+            tr("一次送給 ADE 的 .acsm 數量；建議分批處理，避免憑證排隊過期")
+        )
         self.lbl_search.setText(tr("搜尋"))
         self.lbl_filter.setText(tr("篩選"))
         self.lbl_lang.setText(tr("語言"))

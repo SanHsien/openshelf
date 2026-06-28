@@ -40,11 +40,19 @@ _EN: dict[str, str] = {
     "ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證": (
         "Use when ADE shows E_ADEPT_REQUEST_EXPIRED: ignore validity days and re-download official .acsm tokens"
     ),
+    "包含已送出": "Include sent",
+    "ADE 當場失敗時使用：重新送出先前已交接的 .acsm": (
+        "Use when ADE fails immediately: resend .acsm files that were already handed off"
+    ),
     "略過已知失敗": "Skip known failures",
     "顯示封面": "Show covers",
     # 標籤
     "無 DRM 格式": "DRM-free format",
     "目標": "Target",
+    "批次": "Batch",
+    "一次送給 ADE 的 .acsm 數量；建議分批處理，避免憑證排隊過期": (
+        "Number of .acsm files to send to ADE at once; process in batches to avoid queued tokens expiring"
+    ),
     "搜尋": "Search",
     "篩選": "Filter",
     "紀錄": "Log",
