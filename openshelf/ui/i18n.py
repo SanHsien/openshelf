@@ -27,15 +27,19 @@ _EN: dict[str, str] = {
     "重新整理": "Refresh",
     "匯出CSV/HTML": "Export CSV/HTML",
     "ℹ 關於": "ℹ About",
-    "預覽EPUB/PDF": "Preview EPUB/PDF",
+    "檢查EPUB/PDF": "Check EPUB/PDF",
     "交接EPUB/PDF": "Hand off EPUB/PDF",
     "EPUB/PDF報表": "EPUB/PDF report",
-    "預覽ACSM": "Preview ACSM",
+    "檢查ACSM": "Check ACSM",
     "開啟ACSM": "Open ACSM",
     "ACSM報表": "ACSM report",
     # 核取方塊
     "抓 .acsm": "Fetch .acsm",
     "重抓逾時 .acsm": "Re-fetch stale .acsm",
+    "強制重抓 .acsm": "Force re-fetch .acsm",
+    "ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證": (
+        "Use when ADE shows E_ADEPT_REQUEST_EXPIRED: ignore validity days and re-download official .acsm tokens"
+    ),
     "略過已知失敗": "Skip known failures",
     "顯示封面": "Show covers",
     # 標籤

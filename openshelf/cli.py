@@ -57,6 +57,7 @@ def scan(ctx: click.Context) -> None:
 @click.option("--only", type=click.Choice(["drm_free", "acsm"]), default=None, help="只下載某一分類（測試用）。")
 @click.option("--limit", type=int, default=None, help="最多下載幾本（測試用）。")
 @click.option("--refresh-acsm", is_flag=True, help="重抓已逾有效天數的 .acsm（以下載時間為準）。")
+@click.option("--force-refresh-acsm", is_flag=True, help="不看有效天數，強制重抓所有已下載的 .acsm。")
 @click.option("--skip-failed", is_flag=True, help="略過已標記 failed 的書（如 Google 端不給檔者），不再重試。")
 @click.pass_context
 def export(
@@ -66,6 +67,7 @@ def export(
     only: str | None,
     limit: int | None,
     refresh_acsm: bool,
+    force_refresh_acsm: bool,
     skip_failed: bool,
 ) -> None:
     cfg = ctx.obj["config"]
@@ -85,6 +87,7 @@ def export(
             limit=limit,
             only=only,
             refresh_acsm=refresh_acsm,
+            force_refresh_acsm=force_refresh_acsm,
             skip_failed=skip_failed,
         )
     except (NotLoggedIn, SessionExpired) as e:

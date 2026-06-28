@@ -180,10 +180,10 @@ class MainWindow(QMainWindow):
         self.btn_update = QPushButton(tr("檢查更新"))
         self.btn_about = QPushButton(tr("ℹ 關於"))
         self.btn_about.setToolTip(tr("關於 OpenShelf（版本、作者、GitHub）"))
-        self.btn_calibre_preview = QPushButton(tr("預覽EPUB/PDF"))
+        self.btn_calibre_preview = QPushButton(tr("檢查EPUB/PDF"))
         self.btn_calibre_import = QPushButton(tr("交接EPUB/PDF"))
         self.btn_calibre_report = QPushButton(tr("EPUB/PDF報表"))
-        self.btn_acsm_preview = QPushButton(tr("預覽ACSM"))
+        self.btn_acsm_preview = QPushButton(tr("檢查ACSM"))
         self.btn_acsm_open = QPushButton(tr("開啟ACSM"))
         self.btn_acsm_report = QPushButton(tr("ACSM報表"))
         self.btn_refresh = QPushButton(tr("重新整理"))
@@ -197,6 +197,10 @@ class MainWindow(QMainWindow):
         self.chk_acsm = QCheckBox(tr("抓 .acsm"))
         self.chk_acsm.setChecked(config.include_acsm)
         self.chk_refresh = QCheckBox(tr("重抓逾時 .acsm"))
+        self.chk_force_refresh = QCheckBox(tr("強制重抓 .acsm"))
+        self.chk_force_refresh.setToolTip(
+            tr("ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證")
+        )
         self.chk_skipfail = QCheckBox(tr("略過已知失敗"))
         self.filter_combo = QComboBox()
         for label, value in _FILTERS:
@@ -256,6 +260,7 @@ class MainWindow(QMainWindow):
         download_bar.addWidget(self.fmt)
         download_bar.addWidget(self.chk_acsm)
         download_bar.addWidget(self.chk_refresh)
+        download_bar.addWidget(self.chk_force_refresh)
         download_bar.addWidget(self.chk_skipfail)
         download_bar.addStretch(1)
         download_group.setLayout(download_bar)
@@ -688,6 +693,7 @@ class MainWindow(QMainWindow):
         prefer = self.fmt.currentText()
         include_acsm = self.chk_acsm.isChecked()
         refresh_acsm = self.chk_refresh.isChecked()
+        force_refresh_acsm = self.chk_force_refresh.isChecked()
         skip_failed = self.chk_skipfail.isChecked()
         self._run(
             lambda w: service.export(
@@ -699,6 +705,7 @@ class MainWindow(QMainWindow):
                 status=w.status.emit,
                 should_stop=w.should_stop,
                 refresh_acsm=refresh_acsm,
+                force_refresh_acsm=force_refresh_acsm,
                 skip_failed=skip_failed,
             ),
             "下載",
@@ -743,7 +750,7 @@ class MainWindow(QMainWindow):
             w.log.emit(f"EPUB/PDF 交接報表：{path}")
             return result
 
-        self._run(task, "預覽 EPUB/PDF")
+        self._run(task, "檢查 EPUB/PDF")
 
     def on_calibre_import(self) -> None:
         cfg = self.cfg
@@ -798,7 +805,7 @@ class MainWindow(QMainWindow):
             w.log.emit(f"ACSM 交接報表：{path}")
             return result
 
-        self._run(task, "預覽 ACSM")
+        self._run(task, "檢查 ACSM")
 
     def on_acsm_open(self) -> None:
         cfg = self.cfg
@@ -953,10 +960,10 @@ class MainWindow(QMainWindow):
         self.btn_update.setText(tr("檢查更新"))
         self.btn_about.setText(tr("ℹ 關於"))
         self.btn_about.setToolTip(tr("關於 OpenShelf（版本、作者、GitHub）"))
-        self.btn_calibre_preview.setText(tr("預覽EPUB/PDF"))
+        self.btn_calibre_preview.setText(tr("檢查EPUB/PDF"))
         self.btn_calibre_import.setText(tr("交接EPUB/PDF"))
         self.btn_calibre_report.setText(tr("EPUB/PDF報表"))
-        self.btn_acsm_preview.setText(tr("預覽ACSM"))
+        self.btn_acsm_preview.setText(tr("檢查ACSM"))
         self.btn_acsm_open.setText(tr("開啟ACSM"))
         self.btn_acsm_report.setText(tr("ACSM報表"))
         self.btn_refresh.setText(tr("重新整理"))
@@ -964,6 +971,10 @@ class MainWindow(QMainWindow):
         self.btn_report.setToolTip(tr("把書庫清單匯出為 CSV 與 HTML 報表並開啟資料夾"))
         self.chk_acsm.setText(tr("抓 .acsm"))
         self.chk_refresh.setText(tr("重抓逾時 .acsm"))
+        self.chk_force_refresh.setText(tr("強制重抓 .acsm"))
+        self.chk_force_refresh.setToolTip(
+            tr("ADE 顯示 E_ADEPT_REQUEST_EXPIRED 時使用：不看有效天數，重新下載官方 .acsm 憑證")
+        )
         self.chk_skipfail.setText(tr("略過已知失敗"))
         self.chk_cover.setText(tr("顯示封面"))
         self.chk_cover.setToolTip(

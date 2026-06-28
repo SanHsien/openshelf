@@ -14,6 +14,7 @@ from openshelf.service import (
     _candidates,
     _disambiguator,
     _is_stale_acsm,
+    _should_refresh_acsm,
     count_stale_acsm,
     write_csv,
     write_html,
@@ -107,6 +108,17 @@ class AcsmStaleness(unittest.TestCase):
         m.books["B"] = self._entry(1)
         m.books["C"] = self._entry(30)
         self.assertEqual(count_stale_acsm(m, _cfg(7)), 2)
+
+    def test_force_refresh_acsm_ignores_valid_days(self):
+        fresh = self._entry(1)
+        self.assertFalse(_should_refresh_acsm(fresh, _cfg(7), False, False))
+        self.assertTrue(_should_refresh_acsm(fresh, _cfg(7), False, True))
+
+    def test_refresh_acsm_only_refreshes_stale(self):
+        fresh = self._entry(1)
+        old = self._entry(10)
+        self.assertFalse(_should_refresh_acsm(fresh, _cfg(7), True, False))
+        self.assertTrue(_should_refresh_acsm(old, _cfg(7), True, False))
 
 
 class Report(unittest.TestCase):

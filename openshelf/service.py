@@ -109,6 +109,18 @@ def _is_stale_acsm(entry: BookEntry, cfg: Config) -> bool:
     return (datetime.now(timezone.utc) - dt).days >= cfg.acsm_valid_days
 
 
+def _should_refresh_acsm(
+    entry: BookEntry,
+    cfg: Config,
+    refresh_acsm: bool,
+    force_refresh_acsm: bool,
+) -> bool:
+    """是否應重抓 .acsm。force 用於 ADE 回報 E_ADEPT_REQUEST_EXPIRED 等已失效情境。"""
+    if entry.category != "acsm":
+        return False
+    return force_refresh_acsm or (refresh_acsm and _is_stale_acsm(entry, cfg))
+
+
 def count_stale_acsm(manifest: Manifest, cfg: Config) -> int:
     """已下載但逾時、建議重抓的 .acsm 本數。"""
     return sum(
@@ -345,6 +357,7 @@ def export(
     limit: int | None = None,
     only: str | None = None,
     refresh_acsm: bool = False,
+    force_refresh_acsm: bool = False,
     skip_failed: bool = False,
     only_failed: bool = False,
 ) -> ExportResult:
@@ -352,6 +365,7 @@ def export(
 
     limit：最多嘗試下載幾本（測試用）。only：只下載某一分類（drm_free / acsm）。
     refresh_acsm：重抓已逾「有效天數」的 .acsm（以下載時間為準）。
+    force_refresh_acsm：不看有效天數，重抓所有既有 .acsm。
     skip_failed：略過 manifest 中已標記 failed 的書，不再重試（如 Google 端不給檔者）。
     """
     log = _tee_log(cfg, log)
@@ -397,9 +411,10 @@ def export(
             if eff == "acsm" and not include_acsm:
                 continue
             if manifest.is_downloaded(vid, cfg.output_dir):
-                # 已下載；逾時的 .acsm 在 refresh_acsm 時重抓，其餘跳過
-                if refresh_acsm and eff == "acsm" and _is_stale_acsm(entry, cfg):
-                    log(f"↻ 逾時重抓：{entry.title or vid}")
+                # 已下載；逾時或強制指定的 .acsm 才重抓，其餘跳過
+                if _should_refresh_acsm(entry, cfg, refresh_acsm, force_refresh_acsm):
+                    reason = "強制重抓" if force_refresh_acsm else "逾時重抓"
+                    log(f"REFRESH {reason}: {entry.title or vid}")
                 else:
                     result.skipped += 1
                     continue
