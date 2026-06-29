@@ -13,7 +13,7 @@
 [![Playwright](https://img.shields.io/badge/Login-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
 [![Download](https://img.shields.io/badge/Transport-HTTP%20(httpx)-blue)](https://www.python-httpx.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Status](https://img.shields.io/badge/Status-穩定版%20v1.0.2-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-穩定版%20v1.0.3-brightgreen)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 </div>
