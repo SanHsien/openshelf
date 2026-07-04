@@ -1,0 +1,149 @@
+name: Release
+
+# 打 tag（v*）時，在 Windows / macOS / Linux 上建置並發佈到 GitHub Releases：
+#   Windows：精簡版 zip、可攜版 zip（含 Chromium）、安裝程式 setup.exe
+#   macOS：OpenShelf.app（zip）
+#   Linux：OpenShelf 執行檔（zip）
+# 皆附 .sha256 校驗檔。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:  # 也允許手動觸發（不一定發佈）
+
+permissions:
+  contents: write
+
+# Windows runner 主控台預設非 UTF-8；強制 UTF-8 避免中文輸出 UnicodeEncodeError
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui,build]"
+
+      - name: Build exe
+        run: python build_exe.py
+
+      - name: Package (lean + portable + checksums)
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "dev" }
+          $lean = "dist/OpenShelf-$ver-windows-x64.zip"
+          Compress-Archive -Path dist/OpenShelf.exe -DestinationPath $lean -Force
+
+          # 可攜版：把 Chromium 裝到 exe 旁的 ms-playwright，再一起打包
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD/dist/ms-playwright"
+          python -m playwright install chromium
+          $portable = "dist/OpenShelf-$ver-windows-x64-portable.zip"
+          Compress-Archive -Path dist/OpenShelf.exe, dist/ms-playwright -DestinationPath $portable -Force
+
+          # SHA256 校驗檔
+          Get-ChildItem dist/*.zip | ForEach-Object {
+            (Get-FileHash $_.FullName -Algorithm SHA256).Hash + "  " + $_.Name |
+              Out-File "$($_.FullName).sha256" -Encoding ascii
+          }
+          Get-ChildItem dist/*.zip, dist/*.sha256 | Select-Object Name, Length
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $ver = ($env:GITHUB_REF_NAME -replace '^v', '')
+          if (-not $ver) { $ver = "0.0.0" }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "installer/openshelf.iss" "/DMyAppVersion=$ver"
+          Get-ChildItem dist/*setup.exe | ForEach-Object {
+            (Get-FileHash $_.FullName -Algorithm SHA256).Hash + "  " + $_.Name |
+              Out-File "$($_.FullName).sha256" -Encoding ascii
+          }
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openshelf-windows
+          path: |
+            dist/*.zip
+            dist/*setup.exe
+            dist/*.sha256
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            (Get-ChildItem dist/*.zip, dist/*setup.exe, dist/*.sha256 |
+              ForEach-Object { $_.FullName }) `
+            --title "OpenShelf $env:GITHUB_REF_NAME" `
+            --generate-notes
+
+  # macOS（.app）與 Linux（執行檔）；在 Windows 建立 Release 後再上傳
+  build-unix:
+    needs: build-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Linux Qt runtime libs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui,build]"
+
+      - name: Build
+        run: python build_exe.py
+
+      - name: Package
+        shell: bash
+        run: |
+          ver="${GITHUB_REF_NAME:-dev}"
+          cd dist
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            zip -ry "OpenShelf-${ver}-macos.zip" OpenShelf.app
+          else
+            zip -j "OpenShelf-${ver}-linux-x64.zip" OpenShelf
+          fi
+          for f in OpenShelf-*.zip; do shasum -a 256 "$f" > "$f.sha256"; done
+          ls -l
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openshelf-${{ runner.os }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/*.zip dist/*.sha256 --clobber

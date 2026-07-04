@@ -1,0 +1,19 @@
+# 登入態 / session（含驗證 cookie，切勿提交）
+.profile/
+*.session
+storage_state.json
+
+# 匯出的電子書
+output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.env
+
+# PyInstaller 打包產物
+build/
+dist/
+ms-playwright/
