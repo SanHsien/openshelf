@@ -44,6 +44,7 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
 - 有更好的做法可提案，但等使用者確認後再執行。
 - 以繁體中文回覆。
 - 程式碼保持完整，不省略。
+- **修 bug 必回註 `REPO_REVIEW.md`（適用所有 AI agent：Claude、Codex、Gemini 等，維護者 2026-07-19 指示，常態慣例）**：每修復 `REPO_REVIEW.md` 列出的問題，須回到對應項目標註修復 commit hash 與日期；修復過程中額外發現並修掉的 bug 也要補註。review 維持 latest-only，但修復狀態必須跟上現況。
 
 ## 指令對照
 
