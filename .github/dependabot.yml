@@ -1,0 +1,72 @@
+version: 2
+updates:
+  # Playwright、HTTP、CLI 與輸出依賴。所有 PR 都保留人工審查，不自動合併。
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:40"
+      timezone: "Asia/Taipei"
+    versioning-strategy: "increase"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      runtime-minor-and-patch:
+        patterns:
+          - "playwright"
+          - "httpx"
+          - "click"
+          - "rich"
+        update-types:
+          - "minor"
+          - "patch"
+      runtime-major:
+        patterns:
+          - "playwright"
+          - "httpx"
+          - "click"
+          - "rich"
+        update-types:
+          - "major"
+      gui-and-build-minor-and-patch:
+        patterns:
+          - "pyside6"
+          - "pyinstaller"
+          - "setuptools"
+        update-types:
+          - "minor"
+          - "patch"
+      gui-and-build-major:
+        patterns:
+          - "pyside6"
+          - "pyinstaller"
+          - "setuptools"
+        update-types:
+          - "major"
+      maintenance-minor-and-patch:
+        patterns:
+          - "packaging"
+        update-types:
+          - "minor"
+          - "patch"
+      maintenance-major:
+        patterns:
+          - "packaging"
+        update-types:
+          - "major"
+
+  # checkout、setup-python、artifact 與 Release actions。
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:40"
+      timezone: "Asia/Taipei"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"

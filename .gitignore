@@ -17,3 +17,6 @@ __pycache__/
 build/
 dist/
 ms-playwright/
+
+# 維護工具輸出
+dependency-freshness-report.md

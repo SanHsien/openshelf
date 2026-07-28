@@ -1,0 +1,199 @@
+name: 依賴新鮮度檢查
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - tools/check_dependency_freshness.py
+      - .github/dependabot.yml
+      - .github/workflows/dependency-freshness.yml
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+  schedule:
+    # 每月 1 日 10:40（Asia/Taipei）盤點全部直接 Python 依賴與 Dependabot PR。
+    - cron: "40 2 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    # pull_request_target 只用來讀取可信任 main 並刷新 Dependabot tracker；
+    # 不檢出、不執行 PR 分支內容。
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      checked_sha: ${{ steps.tracker.outputs.checked_sha }}
+      needs_attention: ${{ steps.tracker.outputs.needs_attention }}
+      report_base64: ${{ steps.tracker.outputs.report_base64 }}
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+
+    steps:
+      - name: 檢出 main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: 設定 Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: 安裝維護工具相依
+        run: python -m pip install --disable-pip-version-check "packaging>=24.0"
+
+      - name: 檢查直接依賴新鮮度
+        id: deps
+        run: |
+          python tools/check_dependency_freshness.py \
+            --github-output \
+            --output dependency-freshness-report.md
+
+      - name: 彙整 Dependabot PR
+        id: tracker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKER_NEEDS_ATTENTION: ${{ steps.deps.outputs.needs_attention }}
+        run: |
+          open_prs="$(gh pr list \
+            --state open \
+            --author app/dependabot \
+            --json number,title,url)"
+          open_pr_count="$(jq 'length' <<< "$open_prs")"
+          needs_attention="$CHECKER_NEEDS_ATTENTION"
+          {
+            echo
+            echo "## Open Dependabot PR"
+            echo
+            if [ "$open_pr_count" -eq 0 ]; then
+              echo "- 無"
+            else
+              jq -r '.[] | "- [#\(.number) \(.title)](\(.url))"' <<< "$open_prs"
+              needs_attention="true"
+            fi
+          } >> dependency-freshness-report.md
+          echo "checked_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "needs_attention=$needs_attention" >> "$GITHUB_OUTPUT"
+          echo "report_base64=$(base64 -w0 dependency-freshness-report.md)" \
+            >> "$GITHUB_OUTPUT"
+          cat dependency-freshness-report.md >> "$GITHUB_STEP_SUMMARY"
+
+  maintain-issue:
+    needs: check
+    if: needs.check.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    env:
+      GH_REPO: ${{ github.repository }}
+    concurrency:
+      group: dependency-freshness-issue
+      cancel-in-progress: false
+
+    steps:
+      - name: 還原檢查報告
+        env:
+          REPORT_BASE64: ${{ needs.check.outputs.report_base64 }}
+        run: printf '%s' "$REPORT_BASE64" | base64 --decode > dependency-freshness-report.md
+
+      - name: 建立或更新維護提醒 issue
+        if: needs.check.outputs.needs_attention == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ needs.check.outputs.checked_sha }}
+        run: |
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$CHECKED_SHA" != "$latest_sha" ]; then
+            echo "檢查結果已落後目前 main，停止寫入 issue。"
+            exit 0
+          fi
+
+          gh label create dependencies \
+            --color "0366d6" \
+            --description "Dependency updates and maintenance" \
+            --force
+          gh label create dependency-freshness-tracker \
+            --color "5319e7" \
+            --description "Owned by the dependency freshness workflow" \
+            --force
+          issues_json="$(gh issue list \
+            --state all \
+            --label dependency-freshness-tracker \
+            --limit 100 \
+            --json number,state,title \
+            --jq '[.[] | select(.title == "依賴新鮮度檢查：需要維護")]')"
+          issue_count="$(jq 'length' <<< "$issues_json")"
+          if [ "$issue_count" -gt 1 ]; then
+            echo "找到多個 dependency freshness tracker，停止寫入。"
+            exit 1
+          fi
+          issue_json="$(jq '.[0] // {}' <<< "$issues_json")"
+          issue="$(jq -r '.number // empty' <<< "$issue_json")"
+          if [ -n "$issue" ]; then
+            if [ "$(jq -r '.state' <<< "$issue_json")" = "CLOSED" ]; then
+              gh issue reopen "$issue"
+            fi
+            gh issue edit "$issue" --body-file dependency-freshness-report.md
+            gh issue edit "$issue" \
+              --add-assignee "$GITHUB_REPOSITORY_OWNER" \
+              --add-label dependencies \
+              --add-label dependency-freshness-tracker
+          else
+            gh issue create \
+              --title "依賴新鮮度檢查：需要維護" \
+              --body-file dependency-freshness-report.md \
+              --assignee "$GITHUB_REPOSITORY_OWNER" \
+              --label dependencies \
+              --label dependency-freshness-tracker
+          fi
+
+      - name: 關閉已解決的維護提醒 issue
+        if: needs.check.outputs.needs_attention == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ needs.check.outputs.checked_sha }}
+        run: |
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$CHECKED_SHA" != "$latest_sha" ]; then
+            echo "檢查結果已落後目前 main，停止關閉 issue。"
+            exit 0
+          fi
+
+          open_pr_count="$(gh pr list \
+            --state open \
+            --author app/dependabot \
+            --json number \
+            --jq 'length')"
+          if [ "$open_pr_count" -ne 0 ]; then
+            echo "Dependabot PR 狀態已變更，保留 tracker 等待下一次刷新。"
+            exit 0
+          fi
+
+          issues_json="$(gh issue list \
+            --state open \
+            --label dependency-freshness-tracker \
+            --limit 100 \
+            --json number,title \
+            --jq '[.[] | select(.title == "依賴新鮮度檢查：需要維護")]')"
+          issue_count="$(jq 'length' <<< "$issues_json")"
+          if [ "$issue_count" -gt 1 ]; then
+            echo "找到多個 dependency freshness tracker，停止關閉。"
+            exit 1
+          fi
+          issue="$(jq -r '.[0].number // empty' <<< "$issues_json")"
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" \
+              --comment "本次檢查已確認直接依賴皆為最新，且沒有 open Dependabot PR，關閉提醒。"
+          fi
