@@ -9,7 +9,8 @@ permissions:
   checks: write
   contents: read
   issues: write
-  pull-requests: read
+  # gh issue edit 對 PR 加標籤會走 addLabelsToLabelable GraphQL mutation。
+  pull-requests: write
 
 jobs:
   classify:
