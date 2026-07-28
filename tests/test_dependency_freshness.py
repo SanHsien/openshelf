@@ -95,7 +95,7 @@ class DependencyStatusTest(unittest.TestCase):
         report = freshness.render_markdown(rows)
         self.assertIn("OpenShelf 依賴新鮮度檢查", report)
         self.assertIn("需要維護", report)
-        self.assertIn("不自動合併", report)
+        self.assertIn("guarded auto-merge", report)
 
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "github-output.txt"
