@@ -28,7 +28,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 | 語法 | `python -m compileall -q app.py build_exe.py openshelf tests tools`：通過 |
 | 隔離安裝 | 全新 Python 3.11 venv 以 `.[gui,build,maintenance]` editable install、`pip check`、128 項測試、離線 GUI smoke 均通過 |
 | 依賴維護 | `5579469` 新增每週 Dependabot（pip / GitHub Actions）與每月 freshness 排程；2026-07-29 完成人工覆核並 squash merge PR #5–#15，open PR / issue 均為 0；[freshness run 30444783105](https://github.com/SanHsien/openshelf/actions/runs/30444783105) 確認八項直接依賴皆為最新並自動關閉 [tracker issue #1](https://github.com/SanHsien/openshelf/issues/1) |
-| Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。本輪 11 張超出 allowlist 的 PR 均先換到最新 `main`、綁定新 head 重跑 checks，再由人工合併；policy 仍維持 fail closed |
+| Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。本輪 11 張超出 allowlist 的 PR 均換到最新 `main` 並綁定新 head 重跑 checks；其中 10 張在 fresh checks 完成後人工合併，PR #8 因 GitHub check 掛載 race 先完成合併，隨後其 PR head 三版本 CI 與 merge commit 的 `main` CI 均成功；policy 仍維持 fail closed |
 | Release dry run | [Release run 30444781258](https://github.com/SanHsien/openshelf/actions/runs/30444781258) 以 `workflow_dispatch` 成功完成 Windows、macOS、Linux 建置及 workflow artifact 上傳；因非 tag，沒有建立公開 Release |
 | Workflow 靜態檢查 | actionlint v1.7.12：全部 GitHub Actions workflows 通過 |
 | 套件建置 | 成功產出 `openshelf-1.0.3-py3-none-any.whl` |
