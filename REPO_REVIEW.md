@@ -1,8 +1,8 @@
 # OpenShelf 專案覆核
 
-覆核日期：2026-07-12；維護狀態更新：2026-07-28
+覆核日期：2026-07-12；維護狀態更新：2026-07-29
 
-原始全 repo 覆核基準：`origin/main` / `58c61dd`；依賴維護：`5579469`、guarded auto-merge：`aa29629`、label permission 修復：`e2a6a77`
+原始全 repo 覆核基準：`origin/main` / `58c61dd`；依賴維護：`5579469`、guarded auto-merge：`aa29629`、label permission 修復：`e2a6a77`；人工覆核依賴更新：`b2b4219`–`86bf081`
 
 範圍：Python 程式碼、測試、文件、套件建置、GitHub Actions、Release 與 repo 安全設定。
 
@@ -22,14 +22,15 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 | 檢查 | 結果 |
 |---|---|
-| 遠端基準 | `main`、`origin/main` 均為 `58c61dd`；覆核開始前工作樹乾淨 |
-| GitHub CI | `e2a6a77` 的 CI 成功，Python 3.11 / 3.12 / 3.13 |
+| 遠端基準 | 本輪依賴處理完成時 `main`、`origin/main` 均為 `86bf081`；工作樹僅有本文件的狀態更新 |
+| GitHub CI | `86bf081` 的 [CI run 30444705032](https://github.com/SanHsien/openshelf/actions/runs/30444705032) 成功，Python 3.11 / 3.12 / 3.13；checkout / setup-python v7 均由完整 SHA 固定 |
 | 單元／整合測試 | `python -m unittest discover -s tests -v`：128 項全數通過 |
 | 語法 | `python -m compileall -q app.py build_exe.py openshelf tests tools`：通過 |
-| 隔離安裝 | 全新 venv 以 `.[maintenance]` editable install、`pip check`、128 項測試均通過 |
-| 依賴維護 | `5579469` 新增每週 Dependabot（pip / GitHub Actions）與每月 freshness 排程；首次 workflow 成功建立 [tracker issue #1](https://github.com/SanHsien/openshelf/issues/1)，並列出 11 個需人工審查的 PR |
-| Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。live deny-path 以 PR #15 驗證成功，現有 11 張 PR 均標為 `dependencies-manual-review` |
-| Workflow 靜態檢查 | actionlint v1.7.12：CI 與 dependency freshness workflows 通過 |
+| 隔離安裝 | 全新 Python 3.11 venv 以 `.[gui,build,maintenance]` editable install、`pip check`、128 項測試、離線 GUI smoke 均通過 |
+| 依賴維護 | `5579469` 新增每週 Dependabot（pip / GitHub Actions）與每月 freshness 排程；2026-07-29 完成人工覆核並 squash merge PR #5–#15，open PR / issue 均為 0；[freshness run 30444783105](https://github.com/SanHsien/openshelf/actions/runs/30444783105) 確認八項直接依賴皆為最新並自動關閉 [tracker issue #1](https://github.com/SanHsien/openshelf/issues/1) |
+| Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。本輪 11 張超出 allowlist 的 PR 均先換到最新 `main`、綁定新 head 重跑 checks，再由人工合併；policy 仍維持 fail closed |
+| Release dry run | [Release run 30444781258](https://github.com/SanHsien/openshelf/actions/runs/30444781258) 以 `workflow_dispatch` 成功完成 Windows、macOS、Linux 建置及 workflow artifact 上傳；因非 tag，沒有建立公開 Release |
+| Workflow 靜態檢查 | actionlint v1.7.12：全部 GitHub Actions workflows 通過 |
 | 套件建置 | 成功產出 `openshelf-1.0.3-py3-none-any.whl` |
 | Ruff | production code 1 項錯誤；tests 2 項錯誤；目前 CI 未執行 lint |
 | Coverage | 全套測試 line coverage 41%；`scan`、`export`、CLI、GUI、瀏覽器登入流程未被執行 |
@@ -163,7 +164,9 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [ ] 保存建置時的相依版本清單或 SBOM。
 - [ ] 打包後至少做離線啟動 smoke：import 主要模組、載入設定、建立 GUI 後立即關閉；不接觸真實登入態或 Google 端點。
 
-進度（2026-07-28，commits `5579469`、`aa29629`、`e2a6a77`）：已完成依賴更新偵測、issue lifecycle 與窄範圍 guarded auto-merge。Dependabot 每週一 06:40（Asia/Taipei）檢查 pip / GitHub Actions；freshness workflow 每月 1 日 10:40 檢查直接 PyPI 依賴，並在 Dependabot PR 開關時即時刷新單一 tracker issue。只有 CI 覆蓋的 `packaging` maintenance minor／patch，以及低權限 `ci.yml` 中 allowlist Actions 的 minor／patch，可在綁定 head SHA 的政策 check、最新三版本 CI、mergeability 與換頭複驗全部通過後自動 squash merge；其餘一律人工審查。這解決「持續偵測、追蹤與低風險更新處理」，但 Release constraints / lock、SBOM 與產物 smoke test 仍未完成，因此本項維持未關閉。
+進度（2026-07-29，commits `5579469`、`aa29629`、`e2a6a77`、`b2b4219`–`86bf081`）：已完成依賴更新偵測、issue lifecycle、窄範圍 guarded auto-merge，以及首批人工審查更新。Dependabot 每週一 06:40（Asia/Taipei）檢查 pip / GitHub Actions；freshness workflow 每月 1 日 10:40 檢查直接 PyPI 依賴，並在 Dependabot PR 開關時即時刷新單一 tracker issue。只有 CI 覆蓋的 `packaging` maintenance minor／patch，以及低權限 `ci.yml` 中 allowlist Actions 的 minor／patch，可在綁定 head SHA 的政策 check、最新三版本 CI、mergeability 與換頭複驗全部通過後自動 squash merge；其餘一律人工審查。
+
+本輪人工審查將 runtime / GUI / build 最低版本更新為 Playwright 1.61.0、HTTPX 0.28.1、Click 8.4.2、Rich 15.0.0、PySide6 6.11.1、PyInstaller 6.21.0、Packaging 26.2 與 Setuptools 83.0.0，並將 checkout、setup-python、upload-artifact 更新到 v7 的完整 commit SHA。全新 Python 3.11 環境以完整 extras 安裝後，`pip check`、128 項測試、離線 GUI smoke、wheel、Windows PyInstaller executable 及 executable 啟動 smoke 均通過；GitHub 端再以三版本 CI 與三平台 Release dry run 複驗。依賴維護 issue 已關閉；較廣的 Release constraints / lock、SBOM 與正式產物 smoke gate 仍屬本節原列 P2 待辦。
 
 修復紀錄（2026-07-28，commit `e2a6a77`）：首次 live `pull_request_target` 驗證發現，GitHub CLI 對 PR 執行 `addLabelsToLabelable` 需要 `pull-requests: write`，原本只給 read 會讓分類 workflow 在貼標籤時失敗。已只在受 Dependabot author、`main`、OPEN state 與 trusted-base checkout 限制的 review workflow 恢復該必要權限；PR #15 rebase 後的 run `30376429732` 成功，head-bound `Dependabot policy` 為 neutral、套用 `dependencies-manual-review`，未進入 auto-merge queue。
 
