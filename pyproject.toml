@@ -8,7 +8,7 @@ license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE.md"]
 authors = [{ name = "SanHsien", email = "sanhsien@pm.me" }]
 dependencies = [
-    "playwright>=1.44",
+    "playwright>=1.61.0",
     "httpx>=0.28.1",
     "click>=8.1",
     "rich>=15.0.0",
