@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gui = ["PySide6>=6.11.1"]
-build = ["pyinstaller>=6.6"]
+build = ["pyinstaller>=6.21.0"]
 maintenance = ["packaging>=26.2"]
 
 [project.scripts]
