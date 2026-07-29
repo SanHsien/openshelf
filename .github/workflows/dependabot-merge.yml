@@ -1,0 +1,268 @@
+name: Dependabot guarded merge
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "要重新檢查的 Dependabot PR number"
+        required: false
+        type: number
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  # 所有依賴 PR 共用一條合併序列，避免同時修改 pyproject.toml 或 workflows。
+  group: dependabot-merge-queue
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: 選取合併序列最前方 PR
+        id: queue
+        env:
+          EVENT_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          REQUESTED_PR: ${{ inputs.pr_number }}
+        run: |
+          if [ -n "$REQUESTED_PR" ]; then
+            pr_number="$REQUESTED_PR"
+          elif [ -n "$EVENT_PR" ]; then
+            pr_number="$EVENT_PR"
+          else
+            pr_number="$(gh pr list \
+              --state open \
+              --author app/dependabot \
+              --label dependencies-auto-merge \
+              --json number \
+              --jq 'sort_by(.number) | .[0].number // empty')"
+          fi
+          if [ -z "$pr_number" ]; then
+            echo "沒有等待處理的低風險 Dependabot PR。"
+            exit 0
+          fi
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: 確認身分、標籤與完整 checks
+        id: gate
+        if: steps.queue.outputs.pr_number != ''
+        env:
+          PR_NUMBER: ${{ steps.queue.outputs.pr_number }}
+        run: |
+          pr_json="$(gh pr view "$PR_NUMBER" \
+            --json author,baseRefName,headRefOid,labels,mergeable,mergeStateStatus,state)"
+          author="$(jq -r '.author.login' <<< "$pr_json")"
+          base="$(jq -r '.baseRefName' <<< "$pr_json")"
+          state="$(jq -r '.state' <<< "$pr_json")"
+          if [[ "$author" != "app/dependabot" || "$base" != "main" || "$state" != "OPEN" ]]; then
+            echo "非開啟中的 main Dependabot PR，停止。"
+            exit 0
+          fi
+
+          for attempt in {1..6}; do
+            mergeable="$(jq -r '.mergeable' <<< "$pr_json")"
+            [[ "$mergeable" != "UNKNOWN" ]] && break
+            sleep 5
+            pr_json="$(gh pr view "$PR_NUMBER" \
+              --json author,baseRefName,headRefOid,labels,mergeable,mergeStateStatus,state)"
+          done
+
+          head_sha="$(jq -r '.headRefOid' <<< "$pr_json")"
+          mergeable="$(jq -r '.mergeable' <<< "$pr_json")"
+          merge_state="$(jq -r '.mergeStateStatus' <<< "$pr_json")"
+          auto_label="$(jq -r '[.labels[].name == "dependencies-auto-merge"] | any' <<< "$pr_json")"
+          manual_label="$(jq -r '[.labels[].name == "dependencies-manual-review"] | any' <<< "$pr_json")"
+          rebase_requested="$(
+            jq -r '[.labels[].name == "dependencies-rebase-requested"] | any' <<< "$pr_json"
+          )"
+
+          if [[ "$auto_label" != "true" || "$manual_label" == "true" ]]; then
+            echo "沒有有效的低風險自動合併決策，停止。"
+            exit 0
+          fi
+          if [[ "$mergeable" == "CONFLICTING" || "$merge_state" == "DIRTY" || "$merge_state" == "BEHIND" ]]; then
+            if [[ "$rebase_requested" != "true" ]]; then
+              gh pr edit "$PR_NUMBER" --add-label "dependencies-rebase-requested"
+              gh pr comment "$PR_NUMBER" --body "@dependabot rebase"
+            fi
+            echo "PR 需依最新 main 重整，等待 synchronize 後重新跑 Gate。"
+            exit 0
+          fi
+          if [[ "$mergeable" != "MERGEABLE" ]]; then
+            echo "GitHub 尚無法確認 PR 可合併（$mergeable / $merge_state），停止。"
+            exit 0
+          fi
+
+          policy_conclusion="$(gh api \
+            "repos/$GITHUB_REPOSITORY/commits/$head_sha/check-runs?per_page=100" \
+            --jq '
+              .check_runs
+              | map(select(.name == "Dependabot policy" and .app.slug == "github-actions"))
+              | sort_by(.started_at)
+              | reverse
+              | .[0].conclusion // "MISSING"
+            ')"
+          if [[ "$policy_conclusion" != "success" ]]; then
+            echo "head SHA 沒有可信的低風險政策 Check，停止（$policy_conclusion）。"
+            exit 0
+          fi
+
+          verify_ci() {
+            local expected_head="$1"
+            local expected_pr="$2"
+            local runs_json latest_run run_id run_status run_conclusion jobs_json match_count
+            runs_json="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$expected_head&event=pull_request&per_page=100")"
+            latest_run="$(jq -c \
+              --arg head "$expected_head" \
+              --argjson pr "$expected_pr" \
+              '[
+                .workflow_runs[]
+                | select(
+                    .event == "pull_request"
+                    and .head_sha == $head
+                    and any(.pull_requests[]?; .number == $pr)
+                  )
+              ] | sort_by(.created_at) | reverse | .[0] // {}' \
+              <<< "$runs_json")"
+            run_id="$(jq -r '.id // empty' <<< "$latest_run")"
+            run_status="$(jq -r '.status // "missing"' <<< "$latest_run")"
+            run_conclusion="$(jq -r '.conclusion // "missing"' <<< "$latest_run")"
+            if [[ -z "$run_id" || "$run_status" != "completed" || "$run_conclusion" != "success" ]]; then
+              echo "目前 head SHA 的最新 CI 尚未成功（$run_status / $run_conclusion）。"
+              return 1
+            fi
+
+            jobs_json="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
+            for check_name in "test (3.11)" "test (3.12)" "test (3.13)"; do
+              match_count="$(jq \
+                --arg name "$check_name" \
+                --arg head "$expected_head" \
+                '[
+                  .jobs[]
+                  | select(
+                      .name == $name
+                      and .head_sha == $head
+                      and .status == "completed"
+                      and .conclusion == "success"
+                    )
+                ] | length' \
+                <<< "$jobs_json")"
+              if [ "$match_count" -ne 1 ]; then
+                echo "$check_name 未在唯一可信 CI run 成功。"
+                return 1
+              fi
+            done
+          }
+          if ! verify_ci "$head_sha" "$PR_NUMBER"; then
+            echo "必要 CI 尚未收斂，等待下一次 Gate。"
+            exit 0
+          fi
+
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: 防止換頭或決策變更後自動合併
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          EXPECTED_HEAD: ${{ steps.gate.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.queue.outputs.pr_number }}
+        run: |
+          current_json="$(gh pr view "$PR_NUMBER" \
+            --json author,baseRefName,headRefOid,labels,mergeable,mergeStateStatus,state)"
+          test "$(jq -r '.author.login' <<< "$current_json")" = "app/dependabot"
+          test "$(jq -r '.baseRefName' <<< "$current_json")" = "main"
+          test "$(jq -r '.state' <<< "$current_json")" = "OPEN"
+          test "$(jq -r '.headRefOid' <<< "$current_json")" = "$EXPECTED_HEAD"
+          test "$(jq -r '[.labels[].name == "dependencies-auto-merge"] | any' <<< "$current_json")" = "true"
+          test "$(jq -r '[.labels[].name == "dependencies-manual-review"] | any' <<< "$current_json")" = "false"
+          test "$(jq -r '.mergeable' <<< "$current_json")" = "MERGEABLE"
+          merge_state="$(jq -r '.mergeStateStatus' <<< "$current_json")"
+          test "$merge_state" != "BEHIND"
+          test "$merge_state" != "DIRTY"
+
+          policy_conclusion="$(gh api \
+            "repos/$GITHUB_REPOSITORY/commits/$EXPECTED_HEAD/check-runs?per_page=100" \
+            --jq '
+              .check_runs
+              | map(select(.name == "Dependabot policy" and .app.slug == "github-actions"))
+              | sort_by(.started_at)
+              | reverse
+              | .[0].conclusion // "MISSING"
+            ')"
+          test "$policy_conclusion" = "success"
+
+          verify_ci() {
+            local expected_head="$1"
+            local expected_pr="$2"
+            local runs_json latest_run run_id jobs_json match_count
+            runs_json="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$expected_head&event=pull_request&per_page=100")"
+            latest_run="$(jq -c \
+              --arg head "$expected_head" \
+              --argjson pr "$expected_pr" \
+              '[
+                .workflow_runs[]
+                | select(
+                    .event == "pull_request"
+                    and .head_sha == $head
+                    and any(.pull_requests[]?; .number == $pr)
+                  )
+              ] | sort_by(.created_at) | reverse | .[0] // {}' \
+              <<< "$runs_json")"
+            run_id="$(jq -r '.id // empty' <<< "$latest_run")"
+            test -n "$run_id"
+            test "$(jq -r '.status // "missing"' <<< "$latest_run")" = "completed"
+            test "$(jq -r '.conclusion // "missing"' <<< "$latest_run")" = "success"
+
+            jobs_json="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100")"
+            for check_name in "test (3.11)" "test (3.12)" "test (3.13)"; do
+              match_count="$(jq \
+                --arg name "$check_name" \
+                --arg head "$expected_head" \
+                '[
+                  .jobs[]
+                  | select(
+                      .name == $name
+                      and .head_sha == $head
+                      and .status == "completed"
+                      and .conclusion == "success"
+                    )
+                ] | length' \
+                <<< "$jobs_json")"
+              test "$match_count" -eq 1
+            done
+          }
+          verify_ci "$EXPECTED_HEAD" "$PR_NUMBER"
+
+      - name: Squash 合併並刪除分支
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          PR_NUMBER: ${{ steps.queue.outputs.pr_number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --delete-branch \
+            --match-head-commit "${{ steps.gate.outputs.head_sha }}"
+          test "$(gh pr view "$PR_NUMBER" --json state --jq .state)" = "MERGED"
+
+      - name: 合併後重新驗證維護 issue
+        if: steps.gate.outputs.ready == 'true'
+        run: gh workflow run dependency-freshness.yml --ref main

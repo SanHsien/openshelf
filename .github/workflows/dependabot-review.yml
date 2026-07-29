@@ -1,0 +1,149 @@
+name: Dependabot risk review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  actions: write
+  checks: write
+  contents: read
+  issues: write
+  # gh issue edit 對 PR 加標籤會走 addLabelsToLabelable GraphQL mutation。
+  pull-requests: write
+
+jobs:
+  classify:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'SanHsien/openshelf' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      # pull_request_target 只執行 base commit 的受信任政策，不執行 PR 內程式碼。
+      - name: 檢出受信任政策
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: 驗證 Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: 判斷風險
+        id: policy
+        env:
+          DEPENDENCIES: ${{ steps.metadata.outputs.dependency-names }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          file_args=()
+          while IFS= read -r file; do
+            file_args+=(--changed-file "$file")
+          done < <(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
+          gh pr diff "$PR_NUMBER" --patch > "$RUNNER_TEMP/dependabot.patch"
+
+          python tools/classify_dependabot_update.py \
+            --ecosystem "$ECOSYSTEM" \
+            --dependency-type "$DEPENDENCY_TYPE" \
+            --update-type "$UPDATE_TYPE" \
+            --dependency-names "$DEPENDENCIES" \
+            --patch-file "$RUNNER_TEMP/dependabot.patch" \
+            --github-output \
+            "${file_args[@]}"
+
+      - name: 建立綁定 head SHA 的政策 Check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DECISION: ${{ steps.policy.outputs.decision }}
+          REASON: ${{ steps.policy.outputs.reason }}
+        run: |
+          if [[ "$DECISION" == "auto_merge" ]]; then
+            conclusion="success"
+            title="政策已核可，可在必要 checks 通過後自動合併"
+          else
+            conclusion="neutral"
+            title="保留人工審查"
+          fi
+          jq -n \
+            --arg name "Dependabot policy" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg conclusion "$conclusion" \
+            --arg title "$title" \
+            --arg summary "$REASON" \
+            '{
+              name: $name,
+              head_sha: $head_sha,
+              status: "completed",
+              conclusion: $conclusion,
+              output: {title: $title, summary: $summary}
+            }' |
+            gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" --input -
+
+      - name: 套用判斷標籤
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DECISION_LABEL: ${{ steps.policy.outputs.label }}
+        run: |
+          gh label create "dependencies-auto-merge" \
+            --color "1f883d" \
+            --description "Policy-approved Dependabot PR" \
+            --force
+          gh label create "dependencies-manual-review" \
+            --color "d4a72c" \
+            --description "Dependabot update requiring human review" \
+            --force
+          gh label create "dependencies-rebase-requested" \
+            --color "0969da" \
+            --description "Dependabot rebase requested by merge queue" \
+            --force
+
+          current_labels="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"
+          for label in \
+            dependencies-auto-merge \
+            dependencies-manual-review \
+            dependencies-rebase-requested; do
+            if grep -Fxq "$label" <<< "$current_labels"; then
+              gh issue edit "$PR_NUMBER" --remove-label "$label"
+            fi
+          done
+          gh issue edit "$PR_NUMBER" --add-label "$DECISION_LABEL"
+
+      - name: 寫入判斷摘要
+        env:
+          DECISION: ${{ steps.policy.outputs.decision }}
+          REASON: ${{ steps.policy.outputs.reason }}
+          DEPENDENCIES: ${{ steps.metadata.outputs.dependency-names }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          {
+            echo "## Dependabot 自動判斷"
+            echo
+            echo "- 決策：\`$DECISION\`"
+            echo "- 原因：$REASON"
+            echo "- 依賴：\`$DEPENDENCIES\`"
+            echo "- 類型：\`$DEPENDENCY_TYPE\`"
+            echo "- 幅度：\`$UPDATE_TYPE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 啟動 checks 收斂 Gate
+        if: steps.policy.outputs.decision == 'auto_merge'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run dependabot-merge.yml \
+            --ref main \
+            -f pr_number="${{ github.event.pull_request.number }}"

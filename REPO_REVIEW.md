@@ -1,8 +1,8 @@
 # OpenShelf 專案覆核
 
-覆核日期：2026-07-12
+覆核日期：2026-07-12；維護狀態更新：2026-07-28
 
-基準：`origin/main` / `58c61dd`
+原始全 repo 覆核基準：`origin/main` / `58c61dd`；依賴維護：`5579469`、guarded auto-merge：`aa29629`、label permission 修復：`e2a6a77`
 
 範圍：Python 程式碼、測試、文件、套件建置、GitHub Actions、Release 與 repo 安全設定。
 
@@ -23,10 +23,13 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 | 檢查 | 結果 |
 |---|---|
 | 遠端基準 | `main`、`origin/main` 均為 `58c61dd`；覆核開始前工作樹乾淨 |
-| GitHub CI | `58c61dd` 的最新 CI 成功，Python 3.11 / 3.12 / 3.13 |
-| 單元／整合測試 | `python -m unittest discover -s tests -v`：105 項全數通過 |
+| GitHub CI | `e2a6a77` 的 CI 成功，Python 3.11 / 3.12 / 3.13 |
+| 單元／整合測試 | `python -m unittest discover -s tests -v`：128 項全數通過 |
 | 語法 | `python -m compileall -q app.py build_exe.py openshelf tests tools`：通過 |
-| 隔離安裝 | 全新 venv 中 editable install、`pip check`、105 項測試均通過 |
+| 隔離安裝 | 全新 venv 以 `.[maintenance]` editable install、`pip check`、128 項測試均通過 |
+| 依賴維護 | `5579469` 新增每週 Dependabot（pip / GitHub Actions）與每月 freshness 排程；首次 workflow 成功建立 [tracker issue #1](https://github.com/SanHsien/openshelf/issues/1)，並列出 11 個需人工審查的 PR |
+| Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。live deny-path 以 PR #15 驗證成功，現有 11 張 PR 均標為 `dependencies-manual-review` |
+| Workflow 靜態檢查 | actionlint v1.7.12：CI 與 dependency freshness workflows 通過 |
 | 套件建置 | 成功產出 `openshelf-1.0.3-py3-none-any.whl` |
 | Ruff | production code 1 項錯誤；tests 2 項錯誤；目前 CI 未執行 lint |
 | Coverage | 全套測試 line coverage 41%；`scan`、`export`、CLI、GUI、瀏覽器登入流程未被執行 |
@@ -160,6 +163,10 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [ ] 保存建置時的相依版本清單或 SBOM。
 - [ ] 打包後至少做離線啟動 smoke：import 主要模組、載入設定、建立 GUI 後立即關閉；不接觸真實登入態或 Google 端點。
 
+進度（2026-07-28，commits `5579469`、`aa29629`、`e2a6a77`）：已完成依賴更新偵測、issue lifecycle 與窄範圍 guarded auto-merge。Dependabot 每週一 06:40（Asia/Taipei）檢查 pip / GitHub Actions；freshness workflow 每月 1 日 10:40 檢查直接 PyPI 依賴，並在 Dependabot PR 開關時即時刷新單一 tracker issue。只有 CI 覆蓋的 `packaging` maintenance minor／patch，以及低權限 `ci.yml` 中 allowlist Actions 的 minor／patch，可在綁定 head SHA 的政策 check、最新三版本 CI、mergeability 與換頭複驗全部通過後自動 squash merge；其餘一律人工審查。這解決「持續偵測、追蹤與低風險更新處理」，但 Release constraints / lock、SBOM 與產物 smoke test 仍未完成，因此本項維持未關閉。
+
+修復紀錄（2026-07-28，commit `e2a6a77`）：首次 live `pull_request_target` 驗證發現，GitHub CLI 對 PR 執行 `addLabelsToLabelable` 需要 `pull-requests: write`，原本只給 read 會讓分類 workflow 在貼標籤時失敗。已只在受 Dependabot author、`main`、OPEN state 與 trusted-base checkout 限制的 review workflow 恢復該必要權限；PR #15 rebase 後的 run `30376429732` 成功，head-bound `Dependabot policy` 為 neutral、套用 `dependencies-manual-review`，未進入 auto-merge queue。
+
 ### P3：文件與實際測試數不同
 
 證據：README `README.md:272` 寫「共 99 個單元／整合測試」，實測為 105。
@@ -168,7 +175,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 ### P3：公開 repo 的治理 gate 尚未啟用
 
-現況：`main` 未設定 branch protection；GitHub secret scanning / push protection 與 code scanning 未啟用。Dependabot security updates 已啟用且目前沒有 open alert。
+現況：`main` 未設定 branch protection；GitHub secret scanning / push protection 與 code scanning 未啟用。Dependabot security updates 已啟用；自 `5579469` 起另有每週版本更新與每月 freshness tracker，自 `aa29629` 起只有明確 low-risk allowlist 可 guarded auto-merge，其餘人工審查；live label permission 修復見 `e2a6a77`。
 
 建議：若 repo 會接受外部 PR，至少要求 CI 必須成功後才能合併，並啟用 secret scanning / push protection。CodeQL 對此小型 Python 專案不是發布阻斷項，但可作為低成本的定期安全檢查。
 
@@ -196,7 +203,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [ ] 強化 `storage_state.json` 權限與 `doctor` 提示。
 - [ ] 把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。
 - [ ] 防護 CSV 公式注入。
-- [ ] 導入 Release constraints / SBOM 與打包產物 smoke test。
+- [ ] 在既有依賴 freshness tracker 之上，導入 Release constraints / SBOM 與打包產物 smoke test。
 - [ ] 視協作需求啟用 branch protection、secret scanning 與 CodeQL。
 
 ## 已確認不是問題
