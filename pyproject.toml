@@ -11,13 +11,13 @@ dependencies = [
     "playwright>=1.44",
     "httpx>=0.28.1",
     "click>=8.1",
-    "rich>=13.7",
+    "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
-gui = ["PySide6>=6.6"]
+gui = ["PySide6>=6.11.1"]
 build = ["pyinstaller>=6.6"]
-maintenance = ["packaging>=24.0"]
+maintenance = ["packaging>=26.2"]
 
 [project.scripts]
 openshelf = "openshelf.cli:main"

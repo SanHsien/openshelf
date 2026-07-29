@@ -1,6 +1,7 @@
 version: 2
 updates:
-  # Playwright、HTTP、CLI 與輸出依賴。所有 PR 都保留人工審查，不自動合併。
+  # Playwright、HTTP、CLI 與輸出依賴。只有 guarded allowlist 可自動合併，
+  # runtime、GUI、build 與所有 major 更新保留人工審查。
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

@@ -156,8 +156,8 @@ def render_markdown(rows: list[dict[str, object]]) -> str:
             "## 處理流程",
             "",
             "1. 查看同批 Dependabot PR、套件 changelog、Python 3.11–3.13 與目標平台相容性。",
-            "2. Playwright、httpx、Qt、PyInstaller、setuptools 與 GitHub Actions 更新一律人工審查；",
-            "   本 repo 不自動合併依賴 PR。",
+            "2. 只有 CI allowlist 中的 maintenance minor／patch，以及低權限 CI workflow 的",
+            "   GitHub Actions minor／patch 可進入 guarded auto-merge；其餘一律人工審查。",
             "3. 通過完整 CI；會影響登入、下載、GUI 或打包鏈時，再完成對應實機／Release 驗證。",
             "4. 直接依賴皆更新且沒有 open Dependabot PR 時，排程會自動關閉維護 issue。",
         ]
