@@ -168,6 +168,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 本輪人工審查將 runtime / GUI / build 最低版本更新為 Playwright 1.61.0、HTTPX 0.28.1、Click 8.4.2、Rich 15.0.0、PySide6 6.11.1、PyInstaller 6.21.0、Packaging 26.2 與 Setuptools 83.0.0，並將 checkout、setup-python、upload-artifact 更新到 v7 的完整 commit SHA。全新 Python 3.11 環境以完整 extras 安裝後，`pip check`、128 項測試、離線 GUI smoke、wheel、Windows PyInstaller executable 及 executable 啟動 smoke 均通過；GitHub 端再以三版本 CI 與三平台 Release dry run 複驗。依賴維護 issue 已關閉；較廣的 Release constraints / lock、SBOM 與正式產物 smoke gate 仍屬本節原列 P2 待辦。
 
+本輪人工審查（2026-08-08）：freshness tracker issue #1 指出 Playwright 最低版本落後，重跑檢查另發現 Packaging 已出 26.3，將兩者更新為 `playwright>=1.62.0` 與 `packaging>=26.3`。兩者皆為 minor／patch，`requires_python` 分別為 `>=3.10` 與 `>=3.9`，涵蓋本專案的 `>=3.11`；Playwright 1.62 的 classifiers 已含 Python 3.11–3.14，且 `openshelf/browser.py` 只用 `sync_playwright()` 與 `chromium.launch_persistent_context()` 這類穩定 API，不受 1.62 影響。128 項測試通過，重跑 `tools/check_dependency_freshness.py` 全部套件為 OK，沒有 open Dependabot PR，維護 issue 由 freshness workflow 自動關閉。
+
 修復紀錄（2026-07-28，commit `e2a6a77`）：首次 live `pull_request_target` 驗證發現，GitHub CLI 對 PR 執行 `addLabelsToLabelable` 需要 `pull-requests: write`，原本只給 read 會讓分類 workflow 在貼標籤時失敗。已只在受 Dependabot author、`main`、OPEN state 與 trusted-base checkout 限制的 review workflow 恢復該必要權限；PR #15 rebase 後的 run `30376429732` 成功，head-bound `Dependabot policy` 為 neutral、套用 `dependencies-manual-review`，未進入 auto-merge queue。
 
 ### P3：文件與實際測試數不同
