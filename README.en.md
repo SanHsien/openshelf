@@ -134,7 +134,7 @@ OpenShelf does not parse `.acsm`, so it does not know Adobe's actual fulfillment
 
 ## 🛣️ Roadmap
 
-Completed: M1–M11 through **v1.0.3** (sign-in, endpoint discovery, classification, HTTP download, retries/verification, desktop GUI, PyInstaller packaging, handoffs/reports/CI, desktop UX, ACSM batch handoff, releases, endpoint self-diagnosis, integration tests, structured logs, and cross-platform CI builds). Windows release artifacts have been locally smoke-tested; macOS and Linux artifacts are CI-built only and have not been tested on those platforms. See the [Chinese README](README.md#️-開發路線) for the detailed roadmap.
+Completed: M1–M11 through **v1.0.4** (sign-in, endpoint discovery, classification, HTTP download, retries/verification, desktop GUI, PyInstaller packaging, handoffs/reports/CI, desktop UX, ACSM batch handoff, releases, endpoint self-diagnosis, integration tests, structured logs, and cross-platform CI builds). Windows release artifacts have been locally smoke-tested; macOS and Linux artifacts are CI-built only and have not been tested on those platforms. See the [Chinese README](README.md#️-開發路線) for the detailed roadmap.
 
 **Never**: DRM circumvention/decryption/stripping, `.acsm` parsing, fulfilling outside ADE, key extraction.
 

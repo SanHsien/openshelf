@@ -85,11 +85,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create $env:GITHUB_REF_NAME `
-            (Get-ChildItem dist/*.zip, dist/*setup.exe, dist/*.sha256 |
-              ForEach-Object { $_.FullName }) `
-            --title "OpenShelf $env:GITHUB_REF_NAME" `
-            --generate-notes
+          $assets = Get-ChildItem dist/*.zip, dist/*setup.exe, dist/*.sha256 |
+            ForEach-Object { $_.FullName }
+          # 歷史重建後 v1.0.3 與 main 沒有共同祖先，--generate-notes 對跨歷史 tag
+          # 不可靠；有人工 release notes 就用人工版，沒有才退回自動產生。
+          $notes = "docs/release-notes/$env:GITHUB_REF_NAME.md"
+          if (Test-Path $notes) {
+            gh release create $env:GITHUB_REF_NAME $assets `
+              --title "OpenShelf $env:GITHUB_REF_NAME" `
+              --notes-file $notes
+          } else {
+            gh release create $env:GITHUB_REF_NAME $assets `
+              --title "OpenShelf $env:GITHUB_REF_NAME" `
+              --generate-notes
+          }
 
   # macOS（.app）與 Linux（執行檔）；在 Windows 建立 Release 後再上傳
   build-unix:

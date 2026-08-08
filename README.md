@@ -13,7 +13,7 @@
 [![Playwright](https://img.shields.io/badge/Login-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
 [![Download](https://img.shields.io/badge/Transport-HTTP%20(httpx)-blue)](https://www.python-httpx.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Status](https://img.shields.io/badge/Status-穩定版%20v1.0.3-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-穩定版%20v1.0.4-brightgreen)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 </div>
@@ -255,7 +255,7 @@ python tools/generate_readme_screenshot.py
 
 ## 🛣️ 開發路線
 
-### ✅ 已完成（M1–M11，目前 v1.0.3）
+### ✅ 已完成（M1–M11，目前 v1.0.4）
 
 - [x] **M1**：瀏覽器一次性登入 + 保存登入態（`browser.py` / `session.py`）
 - [x] **M2**：端點探勘——SyncUserLibrary RPC + SAPISIDHASH 認證，填入 `playbooks.py`
@@ -269,7 +269,7 @@ python tools/generate_readme_screenshot.py
 - [x] **M10**：打包與發佈（v0.5）——CI 自動建置 Windows exe 並發佈 Release（精簡／可攜／安裝程式三種包 + SHA256）、自動更新檢查、首次啟動導覽、程式碼簽章說明
 - [x] **M11**：穩定版（v1.0）——端點自我診斷（`openshelf doctor`）、mock httpx 整合測試（分頁／分類）、結構化日誌（`output/openshelf.log`）、跨平台 CI 建置（macOS `.app`／Linux 執行檔；非 Windows 版本尚未實機測試）
 
-> 目前進度：**穩定版（v1.0.3）**——`login → scan → export` 全線打通；三態分流、下載重試、三種交接與報表、桌面 GUI（搜尋／封面／佇列／中英介面／導覽／檢查更新）、ACSM 分批交接、端點自我診斷與結構化日誌、Windows/macOS/Linux CI 自動發佈。Windows Release 產物已本機啟動／安裝測試；macOS/Linux 產物目前僅由 CI 建置，尚未在對應系統實機測試。共 99 個單元／整合測試。
+> 目前進度：**穩定版（v1.0.4）**——`login → scan → export` 全線打通；三態分流、下載重試、三種交接與報表、桌面 GUI（搜尋／封面／佇列／中英介面／導覽／檢查更新）、ACSM 分批交接、端點自我診斷與結構化日誌、Windows/macOS/Linux CI 自動發佈。Windows Release 產物已本機啟動／安裝測試；macOS/Linux 產物目前僅由 CI 建置，尚未在對應系統實機測試。測試涵蓋 parser、分類、報表、ACSM 時效、i18n 與依賴維護工具，實際項數以 CI 結果為準。
 
 ### 🗺️ 發展路線圖（規劃中）
 
