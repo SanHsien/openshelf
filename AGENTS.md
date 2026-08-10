@@ -46,6 +46,12 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
 - 程式碼保持完整，不省略。
 - **修 bug 必回註 `REPO_REVIEW.md`（適用所有 AI agent：Claude、Codex、Gemini 等，維護者 2026-07-19 指示，常態慣例）**：每修復 `REPO_REVIEW.md` 列出的問題，須回到對應項目標註修復 commit hash 與日期；修復過程中額外發現並修掉的 bug 也要補註。review 維持 latest-only，但修復狀態必須跟上現況。
 
+## 依賴維護
+
+- 每週 Dependabot（pip／GitHub Actions）與每月依賴新鮮度檢查已上線；freshness workflow 自行開關 `依賴新鮮度檢查：需要維護` tracker issue，**不要手動關閉**，把根因（過期的版本下限）修掉讓它自己關。
+- 只有 CI allowlist 內的 maintenance minor／patch 與低權限 workflow 的 Actions minor／patch 可 guarded auto-merge；runtime、GUI、build 與所有 major 一律人工審查。
+- 本機重跑檢查：`python tools/check_dependency_freshness.py --output <路徑>`（預設會寫到 cwd，指定路徑較保險）。
+
 ## 指令對照
 
 - `login` / `scan` / `export` / `status` / `report` / `doctor` / `acsm-open` / `acsm-report` / `ebook-open` / `ebook-report` / `calibre-import` / `calibre-report` / `ui` → 見 README「指令」。

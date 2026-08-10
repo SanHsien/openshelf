@@ -41,6 +41,19 @@ pip install -e ".[gui]"     # 含桌面 UI 相依；只測 CLI 可省略 [gui]
 
 4. **風格**：最小干預 —— 不主動大改命名、不引入新架構；沿用現有風格與繁體中文註解。
 
+## 📦 依賴更新
+
+依賴由自動化維護，送 PR 前請先確認你的改動不會和它衝突：
+
+- **Dependabot** 每週檢查 pip 與 GitHub Actions；**依賴新鮮度檢查**每月盤點 `pyproject.toml` 宣告的下限與 PyPI 最新版。
+- 只有 CI allowlist 內的 maintenance minor／patch，以及低權限 workflow 的 Actions minor／patch 會 guarded auto-merge；**runtime、GUI、build 相依與所有 major 更新一律人工審查**。
+- `依賴新鮮度檢查：需要維護` 這個 issue 由 workflow 自行開關，**請不要手動關閉**——把過期的版本下限更新掉，下一次檢查就會自己關。
+- 本機重跑檢查：`python tools/check_dependency_freshness.py --output <路徑>`。
+
+## 🧾 修 bug 請回註 REPO_REVIEW.md
+
+[`REPO_REVIEW.md`](REPO_REVIEW.md) 是本專案的覆核清單。若你的 PR 修掉了裡面列出的問題，請回到對應項目標註修復的 commit 與日期；修復過程中額外發現並修掉的問題也請補註。這份文件維持 latest-only，但修復狀態必須跟上現況。
+
 ## 🔒 不要提交的東西
 
 `storage_state.json`、`.profile/`、`output/`（含已下載的書、`.acsm`、報表）已列入 `.gitignore`，請勿移除或繞過。**絕不要**把帳號 cookie、Authorization 標頭、任何個資或書檔放進版控。

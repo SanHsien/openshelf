@@ -25,6 +25,8 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
   - 瀏覽器（Playwright）**只負責一次性登入**（優先用本機真 Chrome／Edge，避免 Google 擋自動化），擷取登入態存成 `storage_state.json`。**不在程式碼中處理 Google 帳密**。
   - 枚舉書庫與下載都用 `httpx` 走 Play Books 後端（`SyncUserLibrary` RPC，以 SAPISIDHASH ＋ 網頁版公開 API key 認證；自動分頁）。端點集中隔離在 `playbooks.py`。
 - `manifest.json` 為單一事實來源（續傳、跳過、報表皆依此）；另產出人可讀的 `下載報表.txt`。
+- ACSM 交接只批次用系統預設程式開啟已下載的 `.acsm`；不解析、不改寫、不轉換。
+- EPUB/PDF 交接只處理已下載的無 DRM EPUB/PDF，可選 Calibre 或 ADE；`.acsm` 不匯入 Calibre。
 - 登入態目錄與 `output/`（含已下載的書、`.acsm`、報表）不可進版控（見 `.gitignore`）。
 
 > SAPISIDHASH 只是複製網頁版的合法登入認證（取自己帳號的書庫與官方下載 URL），不屬於 DRM 規避。
@@ -42,6 +44,13 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
 - 有更好的做法可提案，但等使用者確認後再執行。
 - 以繁體中文回覆。
 - 程式碼保持完整，不省略。
+- **修 bug 必回註 `REPO_REVIEW.md`（適用所有 AI agent：Claude、Codex、Gemini 等，維護者 2026-07-19 指示，常態慣例）**：每修復 `REPO_REVIEW.md` 列出的問題，須回到對應項目標註修復 commit hash 與日期；修復過程中額外發現並修掉的 bug 也要補註。review 維持 latest-only，但修復狀態必須跟上現況。
+
+## 依賴維護
+
+- 每週 Dependabot（pip／GitHub Actions）與每月依賴新鮮度檢查已上線；freshness workflow 自行開關 `依賴新鮮度檢查：需要維護` tracker issue，**不要手動關閉**，把根因（過期的版本下限）修掉讓它自己關。
+- 只有 CI allowlist 內的 maintenance minor／patch 與低權限 workflow 的 Actions minor／patch 可 guarded auto-merge；runtime、GUI、build 與所有 major 一律人工審查。
+- 本機重跑檢查：`python tools/check_dependency_freshness.py --output <路徑>`（預設會寫到 cwd，指定路徑較保險）。
 
 ## 指令對照
 

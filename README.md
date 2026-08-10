@@ -52,9 +52,11 @@
 - [設定](#️-設定)
 - [輸出與 manifest](#-輸出與-manifest)
 - [專案結構](#️-專案結構)
+- [測試](#-測試)
 - [開發路線](#️-開發路線)
 - [常見問題](#-常見問題)
-- [限制與注意](#-限制與注意)
+- [打包成 .exe](#-打包成-exepyinstaller)
+- [限制與注意](#️-限制與注意)
 - [第三方工具背景](#-第三方工具背景)
 - [授權與版權](#-授權與版權)
 
@@ -231,15 +233,18 @@ app.py          桌面應用進入點（供打包）
 assets/         應用圖示（openshelf.ico／.png；exe 與視窗 icon 共用）
 openshelf.spec  PyInstaller 打包設定（單檔、視窗模式、內嵌 icon）
 build_exe.py    在本機建置執行檔的便捷腳本
-tools/          維護工具（README 假資料截圖產生腳本）
-tests/          單元測試（解析／分類／命名／manifest／設定）
+tools/          維護工具（README 假資料截圖、依賴新鮮度檢查、Dependabot 更新分類）
+tests/          單元／整合測試（解析、分類、命名、manifest、設定、報表、ACSM 時效、i18n、依賴自動化）
+installer/      Inno Setup 安裝程式腳本（openshelf.iss）
+docs/           截圖流程、第三方工具背景、各版 release notes
+.github/        CI、Release、Dependabot 與依賴新鮮度 workflows；issue／PR 範本
 config.toml     設定檔
 pyproject.toml  套件與相依
 ```
 
 ## 🧪 測試
 
-不需網路，純函式單元測試（解析書庫回應、三態分類、檔名去重與覆核、manifest、設定）：
+不需網路、不需瀏覽器、不需登入態。涵蓋解析書庫回應、三態分類、檔名去重與覆核、manifest、設定、報表、ACSM 時效、中英介面字串，以及以 mock `httpx` 驅動的分頁／分類整合測試與依賴維護工具：
 
 ```bash
 python -m unittest discover -s tests
@@ -349,12 +354,14 @@ Google 對「腳本帶帳密登入」有強力封鎖（CAPTCHA、二階段驗證
 ## 📦 打包成 .exe（PyInstaller）
 
 > [!TIP]
-> **自動發佈（推薦）**：推一個 `v*` 版本標籤（如 `git tag v0.4.0 && git push origin v0.4.0`），GitHub Actions 會在 Windows 上自動建置並發佈到 **Releases**，附三種包：
+> **自動發佈（推薦）**：推一個 `v*` 版本標籤（如 `git tag v1.0.4 && git push origin v1.0.4`），GitHub Actions 會在 Windows 上自動建置並發佈到 **Releases**，附三種包：
 > - **精簡版** `OpenShelf-<版本>-windows-x64.zip`（只含 exe；登入用本機 Chrome/Edge）
 > - **可攜版** `OpenShelf-<版本>-windows-x64-portable.zip`（exe + 內建 Chromium，解壓即用）
 > - **安裝程式** `OpenShelf-<版本>-setup.exe`（開始功能表捷徑、可選桌面捷徑、可解除安裝）
 >
 > 皆附 `.sha256` 校驗檔。流程見 [`.github/workflows/release.yml`](.github/workflows/release.yml)、安裝腳本見 [`installer/openshelf.iss`](installer/openshelf.iss)。
+>
+> **Release notes**：打 tag 前先把該版說明寫進 `docs/release-notes/<tag>.md`（例：`docs/release-notes/v1.0.4.md`），workflow 會優先採用這份人工版本；沒有這個檔才退回 `--generate-notes`。發版前請一併確認 `pyproject.toml` 與 `openshelf/__init__.py` 的版本號和 tag 一致。
 
 > [!NOTE]
 > **關於 Windows SmartScreen**：未經程式碼簽章的 exe 首次執行可能被 SmartScreen 攔下（按「更多資訊 → 仍要執行」即可）。要消除警告需自備**程式碼簽章憑證**（OV/EV code signing），在打包後對 `OpenShelf.exe` 與安裝程式 `signtool sign /fd SHA256 /tr <時間戳伺服器> /td SHA256 ...`。本專案不內含憑證；如需，於 CI 以 secret 注入憑證再加一個簽章步驟。

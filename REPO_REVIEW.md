@@ -1,8 +1,8 @@
 # OpenShelf 專案覆核
 
-覆核日期：2026-07-12；維護狀態更新：2026-07-29
+覆核日期：2026-07-12；維護狀態更新：2026-07-29、2026-08-09
 
-原始全 repo 覆核基準：`origin/main` / `58c61dd`；依賴維護：`5579469`、guarded auto-merge：`aa29629`、label permission 修復：`e2a6a77`；人工覆核依賴更新：`b2b4219`–`86bf081`
+原始全 repo 覆核基準：`origin/main` / `58c61dd`；依賴維護：`5579469`、guarded auto-merge：`aa29629`、label permission 修復：`e2a6a77`；人工覆核依賴更新：`b2b4219`–`86bf081`；v1.0.4 發版與跨歷史 release notes：`977a985`、`dd4ffe4`、`feb60b7`
 
 範圍：Python 程式碼、測試、文件、套件建置、GitHub Actions、Release 與 repo 安全設定。
 
@@ -15,7 +15,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 1. 防止不同書目在檔名正規化後碰撞並互相覆寫。
 2. 未知下載格式必須 fail closed，不能預設為無 DRM EPUB。
 3. 書庫分頁未取齊時必須明確失敗，不能提交不完整 manifest。
-4. 修正目前 `main` 與既有 Release tag 歷史斷開的發布風險。
+4. ~~修正目前 `main` 與既有 Release tag 歷史斷開的發布風險。~~ 已於 2026-08-09（`dd4ffe4`）處理，見下方 P1 該節。
 5. 為真正協調使用者資料的 `scan` / `export` 主流程補整合測試。
 
 ## 實測證據
@@ -31,12 +31,12 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 | Guarded auto-merge | `aa29629` 僅允許 CI 覆蓋的 `packaging` maintenance minor／patch，以及只修改低權限 `ci.yml`、action allowlist、完整 SHA 的 Actions minor／patch；runtime、GUI、build、Release／privileged workflow 與所有 major 更新維持人工審查。本輪 11 張超出 allowlist 的 PR 均換到最新 `main` 並綁定新 head 重跑 checks；其中 10 張在 fresh checks 完成後人工合併，PR #8 因 GitHub check 掛載 race 先完成合併，隨後其 PR head 三版本 CI 與 merge commit 的 `main` CI 均成功；policy 仍維持 fail closed |
 | Release dry run | [Release run 30444781258](https://github.com/SanHsien/openshelf/actions/runs/30444781258) 以 `workflow_dispatch` 成功完成 Windows、macOS、Linux 建置及 workflow artifact 上傳；因非 tag，沒有建立公開 Release |
 | Workflow 靜態檢查 | actionlint v1.7.12：全部 GitHub Actions workflows 通過 |
-| 套件建置 | 成功產出 `openshelf-1.0.3-py3-none-any.whl` |
+| 套件建置 | 成功產出 `openshelf-1.0.3-py3-none-any.whl`（本輪基準版本；2026-08-09 起專案版本為 `1.0.4`） |
 | Ruff | production code 1 項錯誤；tests 2 項錯誤；目前 CI 未執行 lint |
 | Coverage | 全套測試 line coverage 41%；`scan`、`export`、CLI、GUI、瀏覽器登入流程未被執行 |
 | 相依安全 | GitHub Dependabot open alerts：0 |
 | 機密掃描 | tracked files 未找到 cookie、Authorization token、私鑰等憑證；`playbooks.py` 的 Google 網頁公開 API key 屬已知設計，不視為私密金鑰 |
-| Release | 最新 Release 為 `v1.0.3`，跨平台資產與 SHA256 檔案齊全 |
+| Release | 覆核時最新 Release 為 `v1.0.3`；2026-08-09 已發佈 [`v1.0.4`](https://github.com/SanHsien/openshelf/releases/tag/v1.0.4)（[Release run 31255981443](https://github.com/SanHsien/openshelf/actions/runs/31255981443) Windows／macOS／Linux 全綠，10 項資產含 SHA256），採人工 release notes |
 
 本輪沒有用真實 Google 帳號執行 `login` / `scan` / `export`，也沒有在 macOS、Linux 或打包後 GUI 做實機操作。因此端點現況、Google 帳號風控、ADE 交接成功率與非 Windows 執行體驗不在本輪已驗證範圍內。
 
@@ -82,6 +82,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - 下一版做一次性的「歷史重建後首發」：使用人工整理的 release notes，不依賴 `--generate-notes`。
 - 後續所有 tag 都從目前 `main` 的後代建立，恢復連續歷史。
 - Release workflow 增加 preflight：確認上一個可比較 tag 是 `HEAD` 的祖先；不成立時停用自動 notes 並給出明確錯誤。
+
+修復紀錄（2026-08-09，commit `dd4ffe4`）：`v1.0.4` 已依上述第 1–3 點完成「歷史重建後首發」。`.github/workflows/release.yml` 改為存在 `docs/release-notes/<tag>.md` 就用 `--notes-file`，否則才退回 `--generate-notes`；`v1.0.3` 保留未動；`v1.0.4` 由 `dd4ffe4`（`main` 的後代）建立，之後的 tag 已可正常 compare。第 4 點的 workflow preflight（自動判斷上一個 tag 是否為祖先）仍未實作，目前靠人工放置 notes 檔迴避。
 
 ### P1：真正的 `scan` / `export` 協調流程沒有整合測試
 
@@ -178,6 +180,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 建議：若保留數字，改成 105；更耐維護的做法是移除固定數字，改寫成「測試涵蓋……，以 CI 結果為準」。
 
+修復紀錄（2026-08-09，commit `dd4ffe4`）：已採後者，README 改為描述涵蓋範圍並註明以 CI 結果為準，不再寫死項數。
+
 ### P3：公開 repo 的治理 gate 尚未啟用
 
 現況：`main` 未設定 branch protection；GitHub secret scanning / push protection 與 code scanning 未啟用。Dependabot security updates 已啟用；自 `5579469` 起另有每週版本更新與每月 freshness tracker，自 `aa29629` 起只有明確 low-risk allowlist 可 guarded auto-merge，其餘人工審查；live label permission 修復見 `e2a6a77`。
@@ -186,7 +190,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 ### P3：版本資訊有兩個手動來源
 
-現況：`pyproject.toml:3` 與 `openshelf/__init__.py:7` 都寫 `1.0.3`，目前一致。
+現況：`pyproject.toml:3` 與 `openshelf/__init__.py:7` 都寫 `1.0.4`（2026-08-09 隨 `dd4ffe4` 一起更新），目前一致，但仍是兩處手動來源。
 
 建議：發版前加一致性測試，或讓其中一處由 package metadata 讀取，避免 UI、wheel 與 tag 版本日後分叉。
 
@@ -197,10 +201,10 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [ ] 修正檔名正規化碰撞，補資料不覆寫測試。
 - [ ] 未知下載格式改成 fail closed。
 - [ ] 分頁未取齊時明確失敗，不提交部分 manifest。
-- [ ] 決定並實作「斷開歷史後首次發版」策略，避免依賴自動 compare notes。
+- [x] 決定並實作「斷開歷史後首次發版」策略，避免依賴自動 compare notes。（2026-08-09，`dd4ffe4`；workflow preflight 仍待補）
 - [ ] 補 `scan` / `export` 主流程整合測試。
 - [ ] 清掉 Ruff 問題，將 lint 加入 CI。
-- [ ] 更新 README 的測試敘述。
+- [x] 更新 README 的測試敘述。（2026-08-09，`dd4ffe4`）
 
 ### 下一個維護週期
 
