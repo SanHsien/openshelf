@@ -71,3 +71,10 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      # init and analyze must run the exact same version -- a split bump fails
+      # with "Loaded a configuration file for version X, but running version Y",
+      # leaving both pull requests red. Group them so they move together.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
