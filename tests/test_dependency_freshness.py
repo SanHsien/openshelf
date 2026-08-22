@@ -112,5 +112,45 @@ class DependencyStatusTest(unittest.TestCase):
         self.assertIn(f"report_path={report_path.as_posix()}", content)
 
 
+
+class HoldAndDeferralTest(unittest.TestCase):
+    """紅燈的兩條正當出口：長期政策用 hold，這次不升用 deferral。"""
+
+    def test_hold_marker_binds_to_the_package_on_that_line(self):
+        holds = freshness.parse_holds(
+            'dependencies = ["pytest>=8.3"]  # freshness-hold: 矩陣還有 py3.9\n'
+            'other = ["ruff>=0.16"]\n'
+        )
+        self.assertEqual(holds, {"pytest": "矩陣還有 py3.9"})
+
+    def test_a_comment_without_the_marker_is_not_a_hold(self):
+        self.assertEqual(freshness.parse_holds('x = ["ruff>=0.16"]  # 一般註解\n'), {})
+
+    def test_deferral_without_a_reviewed_release_is_ignored(self):
+        # 沒有 deferredLatest 就等於永久靜音，直接忽略。
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "deferrals.json"
+            path.write_text('{"deferrals": {"ruff": {"reason": "later"}}}', encoding="utf-8")
+            self.assertEqual(freshness.load_deferrals(path), {})
+
+    def test_deferral_with_a_reviewed_release_is_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "deferrals.json"
+            path.write_text(
+                '{"deferrals": {"ruff": {"deferredLatest": "0.16.4", "reason": "要先跑 Windows"}}}',
+                encoding="utf-8",
+            )
+            self.assertEqual(freshness.load_deferrals(path), {"ruff": ("0.16.4", "要先跑 Windows")})
+
+    def test_missing_deferrals_file_defers_nothing(self):
+        self.assertEqual(freshness.load_deferrals(Path("no-such-file.json")), {})
+
+    def test_aged_floor_needs_review_unless_held_or_deferred(self):
+        self.assertTrue(freshness.needs_review({"outdated": True, "hold": "", "deferred_reason": ""}))
+        self.assertFalse(freshness.needs_review({"outdated": True, "hold": "政策", "deferred_reason": ""}))
+        self.assertFalse(
+            freshness.needs_review({"outdated": True, "hold": "", "deferred_reason": "已評估"})
+        )
+
 if __name__ == "__main__":
     unittest.main()

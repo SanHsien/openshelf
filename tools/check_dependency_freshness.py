@@ -40,6 +40,57 @@ def is_newer_version(latest: str, current: str) -> bool:
         return False
 
 
+HOLD_MARKER = "freshness-hold:"
+DEFERRALS_PATH = ROOT / ".github" / "dependency-deferrals.json"
+
+
+def parse_holds(text: str) -> dict[str, str]:
+    """Map package -> reason for ``# freshness-hold:`` comments in the source file.
+
+    A hold is a standing policy, not a postponement: some floors are the floor we
+    want, and re-asking every month turns the report into noise. TOML parsers drop
+    comments, so the marker is read off the raw text of the declaring line.
+    """
+    holds: dict[str, str] = {}
+    for line in text.splitlines():
+        head, marker, comment = line.partition("#")
+        reason = comment.strip()[len(HOLD_MARKER) :].strip()
+        if not marker or not comment.strip().startswith(HOLD_MARKER) or not reason:
+            continue
+        for quoted in re.findall(r"\"([^\"]+)\"|'([^']+)'", head):
+            match = _REQUIREMENT_RE.match(quoted[0] or quoted[1])
+            if match:
+                holds[match.group(1).lower()] = reason
+    return holds
+
+
+def load_deferrals(path: Path = DEFERRALS_PATH) -> dict[str, tuple[str, str]]:
+    """Read reviewed-but-not-now decisions: package -> (reviewed release, reason).
+
+    The reviewed release is what makes a deferral expire by itself: once PyPI moves
+    past it the report asks again, so a deferral cannot quietly become a silenced
+    check. An entry without it is ignored for exactly that reason.
+    """
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8")).get("deferrals", {})
+    except (OSError, ValueError):
+        return {}
+    deferrals: dict[str, tuple[str, str]] = {}
+    for name, entry in (entries or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        latest = str(entry.get("deferredLatest", "")).strip()
+        reason = str(entry.get("reason", "")).strip()
+        if latest and reason:
+            deferrals[name.lower()] = (latest, reason)
+    return deferrals
+
+
+def needs_review(row: dict) -> bool:
+    """An aged floor still counts unless a hold or a live deferral covers it."""
+    return bool(row["outdated"]) and not row.get("hold") and not row.get("deferred_reason")
+
+
 def _parse_requirements(
     requirements: Iterable[str],
     group: str,
@@ -68,6 +119,7 @@ def load_direct_dependencies(
     """讀取 runtime、optional 與 build-system 直接依賴。"""
     with pyproject_path.open("rb") as file:
         data = tomllib.load(file)
+    holds = parse_holds(pyproject_path.read_text(encoding="utf-8"))
 
     project = data.get("project", {})
     packages = _parse_requirements(project.get("dependencies", []), "runtime")
@@ -79,6 +131,8 @@ def load_direct_dependencies(
     packages.extend(
         _parse_requirements(build_system.get("requires", []), "build-system")
     )
+    for package in packages:
+        package["hold"] = holds.get(package["name"].lower(), "")
     return packages
 
 
@@ -105,8 +159,10 @@ def fetch_pypi_version(
 
 def collect_status(
     packages: Iterable[dict[str, str]],
+    deferrals: dict[str, tuple[str, str]] | None = None,
 ) -> list[dict[str, object]]:
     """收集 repo 宣告基線、PyPI 最新版與維護狀態。"""
+    deferrals = deferrals if deferrals is not None else load_deferrals()
     rows = []
     for package in packages:
         minimum = package["minimum"]
@@ -117,10 +173,15 @@ def collect_status(
             and latest
             and is_newer_version(str(latest), minimum)
         )
+        reviewed, reason = deferrals.get(package["name"].lower(), ("", ""))
+        deferred = bool(reviewed and latest and not is_newer_version(str(latest), reviewed))
+
         rows.append(
             {
                 **package,
                 "latest": latest or "unknown",
+                "hold": package.get("hold", ""),
+                "deferred_reason": reason if deferred else "",
                 "outdated": outdated,
                 "check_failed": check_failed,
             }
@@ -139,6 +200,10 @@ def render_markdown(rows: list[dict[str, object]]) -> str:
     for row in rows:
         if row["check_failed"]:
             status = "檢查失敗"
+        elif row["outdated"] and row.get("hold"):
+            status = f"HELD: {row['hold']}"
+        elif row["outdated"] and row.get("deferred_reason"):
+            status = f"DEFERRED at {row['latest']}: {row['deferred_reason']}"
         elif row["outdated"]:
             status = "需要維護"
         else:
@@ -206,7 +271,7 @@ def main() -> int:
     output_path.write_text(report, encoding="utf-8")
     print(report)
 
-    outdated = any(bool(row["outdated"]) for row in rows)
+    outdated = any(needs_review(row) for row in rows)
     check_failed = not rows or any(bool(row["check_failed"]) for row in rows)
     if args.github_output:
         write_github_output(outdated, check_failed, output_path)

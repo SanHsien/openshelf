@@ -58,3 +58,16 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
 
 - `login` / `scan` / `export` / `status` / `report` / `doctor` / `acsm-open` / `acsm-report` / `ebook-open` / `ebook-report` / `calibre-import` / `calibre-report` / `ui` → 見 README「指令」。
 - 模組分工 → 見 README「專案結構」。
+
+## 依賴新鮮度：紅燈的兩條正當出口
+
+每月的依賴新鮮度檢查比對的是**宣告**與現行版。當某個下限**不該**跟著現行版走時，只有兩種
+留下理由的做法：
+
+- **維持宣告**：在宣告那一行加 `# freshness-hold: <理由>`。用於長期政策（例如矩陣還有舊
+  Python、或這個下限就是我們要的）。
+- **已延後**：在 `.github/dependency-deferrals.json` 加
+  `{"deferredLatest": "<當時看到的版本>", "reason": "<為什麼這次不升>"}`。PyPI 一超過該版本，
+  延後自動失效、報告恢復提醒——所以不會變成永久靜音。沒有 `deferredLatest` 的條目直接忽略。
+
+**不要用調高下限的方式讓紅燈消失**：宣告是相容性承諾，不是消音鍵。
