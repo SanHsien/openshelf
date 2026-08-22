@@ -51,6 +51,7 @@ OpenShelf 枚舉並批次匯出使用者在 Google Play 圖書購買的電子書
 - 每週 Dependabot（pip／GitHub Actions）與每月依賴新鮮度檢查已上線；freshness workflow 自行開關 `依賴新鮮度檢查：需要維護` tracker issue，**不要手動關閉**，把根因（過期的版本下限）修掉讓它自己關。
 - 只有 CI allowlist 內的 maintenance minor／patch 與低權限 workflow 的 Actions minor／patch 可 guarded auto-merge；runtime、GUI、build 與所有 major 一律人工審查。
 - 本機重跑檢查：`python tools/check_dependency_freshness.py --output <路徑>`（預設會寫到 cwd，指定路徑較保險）。
+- **合併任何 PR 前先讀 diff**（包含 Dependabot 開的）：`gh pr diff <編號>`。CI 綠燈證明的是「測試沒紅」，不是「改了什麼、該不該進 main」——lockfile 的連鎖升級、transitive major、跨出宣告範圍的變更，只有讀 diff 看得到。核准或合併訊息要寫出讀到什麼、為什麼可接受。`dependabot-merge.yml` 依政策自動核准的低風險類別是唯一例外——那條路徑的把關是分類器與必要 checks；只要是人或 agent 手動按下 merge，就適用本條。
 
 ## 指令對照
 
