@@ -10,7 +10,7 @@ authors = [{ name = "SanHsien", email = "sanhsien@pm.me" }]
 dependencies = [
     "playwright>=1.62.0",
     "httpx>=0.28.1",
-    "click>=8.4.2",
+    "click>=8.5.0",
     "rich>=15.0.0",
 ]
 
