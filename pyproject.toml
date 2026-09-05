@@ -10,7 +10,7 @@ authors = [{ name = "SanHsien", email = "sanhsien@pm.me" }]
 dependencies = [
     "playwright>=1.62.0",
     "httpx>=0.28.1",
-    "click>=8.5.0",  # freshness-hold: 8.4.2 是我們實際承諾的相容下限。openshelf.cli 只用 click 的公開穩定 API（group/option/Choice/pass_context/ClickException），沒有任何一處需要 8.5 才有的行為；把下限跟著 PyPI 往上抬，只會讓受控或離線環境（只提供 8.4.2）安裝失敗，換到的僅是報告不再亮紅燈。
+    "click>=8.5.0",  # freshness-hold: 8.5.0 是我們實際承諾的相容下限（2026-09-04 由 8.4.2 提上來，維護者拍板）。openshelf.cli 只用 click 的公開穩定 API（group/option/Choice/pass_context/ClickException），技術上 8.4.x 仍能跑；改動的是「承諾」不是「偵測到不相容」——本線不再承諾只提供 8.4.x 的受控或離線環境。下一個 click 版本出來時這個下限不跟著抬：要再動必須有實際需要 8.6+ 行為的程式碼，或維護者再拍一次板，並同步改寫本行理由。
     "rich>=15.0.0",
 ]
 
