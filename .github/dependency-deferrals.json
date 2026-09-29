@@ -1,0 +1,8 @@
+{
+  "deferrals": {
+    "playwright": {
+      "deferredLatest": "1.63.0",
+      "reason": "Playwright only runs the one-time login; 1.62 covers it and nothing needs 1.63. Raising the floor alone was declined in PR #24 (2026-09-28)."
+    }
+  }
+}
