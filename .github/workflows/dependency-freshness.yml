@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   check:
+    name: 依賴新鮮度檢查
     # pull_request_target 只用來讀取可信任 main 並刷新 Dependabot tracker；
     # 不檢出、不執行 PR 分支內容。
     if: >-
