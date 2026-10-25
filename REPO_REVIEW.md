@@ -174,6 +174,13 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 修復紀錄（2026-07-28，commit `e2a6a77`）：首次 live `pull_request_target` 驗證發現，GitHub CLI 對 PR 執行 `addLabelsToLabelable` 需要 `pull-requests: write`，原本只給 read 會讓分類 workflow 在貼標籤時失敗。已只在受 Dependabot author、`main`、OPEN state 與 trusted-base checkout 限制的 review workflow 恢復該必要權限；PR #15 rebase 後的 run `30376429732` 成功，head-bound `Dependabot policy` 為 neutral、套用 `dependencies-manual-review`，未進入 auto-merge queue。
 
+修復紀錄（2026-10-25，commit `1038d95`）：
+- 檔名碰撞：`service._filename_key` 以正規化後檔名（casefold）分組，撞名時沿用年份／出版社／volume_id 辨識；測試 `tests/test_service_flow.py::test_colliding_normalized_names_do_not_overwrite`。
+- 未知格式：`playbooks._parse_download_block` 略過未知格式碼；測試 `UnknownFormat`。
+- 分頁：`list_library` 在 total 已知卻取不齊（無游標、游標重複、頁數上限）時丟 `IncompleteLibrary`，`scan` 不寫 manifest；CLI 轉成 ClickException。
+- 整合測試：scan 保留既有下載、EPUB 失敗改 PDF、失敗標 failed 且無 `.part`、重抓失敗保留舊檔、401 中止整批、取消。
+- 另修：`ui/i18n.py` 重複鍵 `作者`、`tests/test_service.py` 分號敘述（P2 lint 項）。
+
 ### P3：文件與實際測試數不同
 
 證據：README `README.md:272` 寫「共 99 個單元／整合測試」，實測為 105。
@@ -198,20 +205,20 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 ### 下一版 Release 前
 
-- [ ] 修正檔名正規化碰撞，補資料不覆寫測試。
-- [ ] 未知下載格式改成 fail closed。
-- [ ] 分頁未取齊時明確失敗，不提交部分 manifest。
+- [x] 修正檔名正規化碰撞，補資料不覆寫測試。（2026-10-25，`1038d95`）
+- [x] 未知下載格式改成 fail closed。（2026-10-25，`1038d95`）
+- [x] 分頁未取齊時明確失敗，不提交部分 manifest。（2026-10-25，`1038d95`）
 - [x] 決定並實作「斷開歷史後首次發版」策略，避免依賴自動 compare notes。（2026-08-09，`dd4ffe4`；workflow preflight 仍待補）
-- [ ] 補 `scan` / `export` 主流程整合測試。
-- [ ] 清掉 Ruff 問題，將 lint 加入 CI。
+- [x] 補 `scan` / `export` 主流程整合測試。（2026-10-25，`1038d95`；GUI 取消僅測 `should_stop` 路徑）
+- [x] 清掉 Ruff 問題，將 lint 加入 CI。（2026-10-25，`1038d95`；規則限 E4/E7/E9/F）
 - [x] 更新 README 的測試敘述。（2026-08-09，`dd4ffe4`）
 
 ### 下一個維護週期
 
 - [ ] 定義 manifest 對已移除書籍的同步政策。
-- [ ] 強化 `storage_state.json` 權限與 `doctor` 提示。
+- [ ] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` 提示仍待做）
 - [ ] 把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。
-- [ ] 防護 CSV 公式注入。
+- [x] 防護 CSV 公式注入。（2026-10-25，`1038d95`）
 - [ ] 在既有依賴 freshness tracker 之上，導入 Release constraints / SBOM 與打包產物 smoke test。
 - [ ] 視協作需求啟用 branch protection、secret scanning 與 CodeQL。
 
