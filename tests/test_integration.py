@@ -114,6 +114,17 @@ class ListLibraryPaging(unittest.TestCase):
             with self.assertRaises(IncompleteLibrary):
                 list_library(client)
 
+    def test_incomplete_when_later_page_drops_total(self):
+        page1 = [[_book("A", "書A", _DRM_FREE)], [5], ["t" * 30]]
+        page2 = [[_book("B", "書B", _DRM_FREE)], None, None]  # 後頁沒有總數也沒有游標
+
+        def handler(request):
+            return httpx.Response(200, json=page1 if _token_of(request) is None else page2)
+
+        with self._client(handler) as client:
+            with self.assertRaises(IncompleteLibrary):
+                list_library(client)
+
     def test_incomplete_when_page_limit_reached(self):
         n = {"i": 0}
 

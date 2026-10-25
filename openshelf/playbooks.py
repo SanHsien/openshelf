@@ -204,7 +204,9 @@ def list_library(client: httpx.Client) -> list[LibraryBook]:
             seen.add(b.volume_id)
         books.extend(new)
 
-        total, next_token = _extract_meta(raw)
+        page_total, next_token = _extract_meta(raw)
+        if page_total is not None:  # 後頁若不再帶總數，沿用先前看到的最大值
+            total = max(total or 0, page_total)
         if total is not None and len(books) >= total:  # 已取齊
             return books
         if not new:  # 沒有新書，停
