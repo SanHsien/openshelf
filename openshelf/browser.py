@@ -7,6 +7,7 @@ Google 不允許腳本帶帳密登入；這裡只開一個真實瀏覽器視窗�
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Callable
 
@@ -88,6 +89,10 @@ def login(
                 page.wait_for_timeout(60_000)
 
         context.storage_state(path=str(config.storage_state))
+        try:
+            os.chmod(config.storage_state, 0o600)  # 登入態含敏感 cookie（Windows 不改 ACL）
+        except OSError:
+            pass
         context.close()
 
     return config.storage_state

@@ -10,7 +10,12 @@ import unittest
 import httpx
 
 from openshelf.classify import classify
-from openshelf.playbooks import check_library_endpoint, list_library
+from openshelf.playbooks import (
+    IncompleteLibrary,
+    _parse_library,
+    check_library_endpoint,
+    list_library,
+)
 
 # 下載區塊樣本（block[9] 內含可下載格式）
 _DRM_FREE = [3, None, 2, None, [None, 0], None, 1, None, None,
@@ -89,8 +94,8 @@ class ListLibraryPaging(unittest.TestCase):
         self.assertEqual(sorted(b.volume_id for b in books), ["A", "B"])
         self.assertEqual(calls["n"], 1)  # 取齊 total=2 後即停，不再要第二頁
 
-    def test_stops_without_token(self):
-        single = [[_book("A", "書A", _DRM_FREE)], [99], None]
+    def test_stops_without_token_when_total_unknown(self):
+        single = [[_book("A", "書A", _DRM_FREE)], None, None]
 
         def handler(request):
             return httpx.Response(200, json=single)
@@ -98,6 +103,37 @@ class ListLibraryPaging(unittest.TestCase):
         with self._client(handler) as client:
             books = list_library(client)
         self.assertEqual([b.volume_id for b in books], ["A"])
+
+    def test_incomplete_when_total_larger_and_no_token(self):
+        single = [[_book("A", "書A", _DRM_FREE)], [99], None]
+
+        def handler(request):
+            return httpx.Response(200, json=single)
+
+        with self._client(handler) as client:
+            with self.assertRaises(IncompleteLibrary):
+                list_library(client)
+
+    def test_incomplete_when_page_limit_reached(self):
+        n = {"i": 0}
+
+        def handler(request):
+            n["i"] += 1
+            body = [[_book(f"V{n['i']}", "書", _DRM_FREE)], [10**6], [f"{n['i']:030d}"]]
+            return httpx.Response(200, json=body)
+
+        with self._client(handler) as client:
+            with self.assertRaises(IncompleteLibrary):
+                list_library(client)
+
+
+class UnknownFormat(unittest.TestCase):
+    def test_unknown_format_code_is_skipped_not_epub(self):
+        block = [3, None, 2, None, [None, 0], None, 1, None, None,
+                 [[[999, "https://books.google.com/books/download/x.bin?id=A"]]]]
+        books = _parse_library([[_book("A", "書A", block)]])
+        self.assertEqual(books[0].export_options, [])
+        self.assertEqual(classify(books[0].export_options), "no_export")
 
 
 class EndpointDoctor(unittest.TestCase):

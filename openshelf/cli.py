@@ -13,7 +13,7 @@ from rich.table import Table
 from . import acsm, calibre, playbooks, reader, service
 from .config import load_config
 from .manifest import Manifest
-from .playbooks import EndpointNotConfigured
+from .playbooks import EndpointNotConfigured, IncompleteLibrary
 from .session import NotLoggedIn, SessionExpired, build_client
 
 console = Console()
@@ -46,7 +46,7 @@ def scan(ctx: click.Context) -> None:
         result = service.scan(cfg, log=console.print)
     except (NotLoggedIn, SessionExpired) as e:
         raise click.ClickException(str(e))
-    except EndpointNotConfigured as e:
+    except (EndpointNotConfigured, IncompleteLibrary) as e:
         raise click.ClickException(str(e))
     _print_counts(result.manifest, cfg)
 
@@ -92,7 +92,7 @@ def export(
         )
     except (NotLoggedIn, SessionExpired) as e:
         raise click.ClickException(str(e))
-    except EndpointNotConfigured as e:
+    except (EndpointNotConfigured, IncompleteLibrary) as e:
         raise click.ClickException(str(e))
 
     console.print(

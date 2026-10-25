@@ -18,7 +18,7 @@ from typing import Callable
 
 from .classify import classify
 from .config import Config
-from .export import download_option
+from .export import download_option, safe_filename
 from .logsetup import get_logger
 from .manifest import BookEntry, Manifest, now_iso
 from .playbooks import ExportOption, list_library
@@ -80,6 +80,11 @@ def _candidates(
 
 def _year(published: str) -> str:
     return (published or "")[:4]
+
+
+def _filename_key(entry: BookEntry) -> str:
+    """正規化後的檔名鍵（Windows 檔名不分大小寫，故 casefold）。"""
+    return safe_filename(entry.title, entry.author, "x").casefold()
 
 
 def _disambiguator(entry: BookEntry, group: list[BookEntry]) -> str | None:
@@ -236,6 +241,14 @@ def _row_values(b: BookEntry) -> tuple[str, ...]:
     )
 
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", chr(9), chr(13))
+
+
+def _csv_safe(value: str) -> str:
+    """試算表會把 = + - @ 開頭的儲存格當公式；只在 CSV 輸出層加前置單引號。"""
+    return "'" + value if value.startswith(_FORMULA_PREFIXES) else value
+
+
 def write_csv(manifest: Manifest, cfg: Config) -> Path:
     """匯出書庫清單為 CSV（utf-8-sig，Excel 可直接開）。"""
     import csv
@@ -247,7 +260,7 @@ def write_csv(manifest: Manifest, cfg: Config) -> Path:
         writer = csv.writer(fh)
         writer.writerow(_CSV_HEADERS)
         for b in books:
-            writer.writerow(_row_values(b))
+            writer.writerow([_csv_safe(v) for v in _row_values(b)])
     return path
 
 
@@ -393,9 +406,10 @@ def export(
     attempted = 0
 
     # 同名（書名+作者）分組，供「年 · 出版社」辨識；仍相同才補 volume_id
-    groups: dict[tuple[str, str], list[BookEntry]] = defaultdict(list)
+    # 以「正規化後的檔名」分組：不同書名經非法字元替換或截斷後撞名也會被辨識
+    groups: dict[str, list[BookEntry]] = defaultdict(list)
     for b in manifest.books.values():
-        groups[(b.title, b.author)].append(b)
+        groups[_filename_key(b)].append(b)
 
     client = build_client(cfg)
     with client:
@@ -438,7 +452,7 @@ def export(
             if not candidates:
                 continue
 
-            disambiguator = _disambiguator(entry, groups[(entry.title, entry.author)])
+            disambiguator = _disambiguator(entry, groups[_filename_key(entry)])
             attempted += 1
             status(entry.title or vid)
             filename: str | None = None

@@ -178,12 +178,27 @@ class CsvHtmlExport(unittest.TestCase):
         )
         m = Manifest(out / "manifest.json")
         a = _book("A", title="無DRM書", author="作者甲", publisher="左岸", published="2019")
-        a.category = "drm_free"; a.file_path = "無DRM書.epub"
+        a.category = "drm_free"
+        a.file_path = "無DRM書.epub"
         f = _book("F", title="壞,書", author='含"逗號')  # 測 CSV 跳脫
-        f.category = "failed"; f.note = "404"
+        f.category = "failed"
+        f.note = "404"
         for b in (a, f):
             m.books[b.volume_id] = b
         return m, cfg
+
+    def test_csv_neutralizes_formula_prefixes(self):
+        import csv
+
+        m, cfg = self._manifest_cfg()
+        m.books["X"] = _book("X", title='=HYPERLINK("http://e")', author="@a", publisher="-1")
+        path = write_csv(m, cfg)
+        with path.open(encoding="utf-8-sig", newline="") as fh:
+            rows = {r[8]: r for r in csv.reader(fh)}
+        self.assertEqual(rows["X"][0], "'=HYPERLINK(\"http://e\")")
+        self.assertEqual(rows["X"][1], "'@a")
+        self.assertEqual(rows["X"][2], "'-1")
+        self.assertEqual(m.books["X"].title, '=HYPERLINK("http://e")')  # manifest 保留原值
 
     def test_csv(self):
         import csv

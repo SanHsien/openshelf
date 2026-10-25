@@ -42,6 +42,10 @@ _SAPISID_COOKIES = ("SAPISID", "__Secure-3PAPISID", "__Secure-1PAPISID")
 _FMT_CODE = {1: "epub", 2: "pdf"}
 
 
+class IncompleteLibrary(RuntimeError):
+    """書庫分頁未取齊（取得數少於回應宣告的總數）；不得當成完整 scan 寫回 manifest。"""
+
+
 class EndpointNotConfigured(NotImplementedError):
     """端點或回應對應尚未以實際樣本完成（M2 待辦）。"""
 
@@ -183,10 +187,15 @@ def _extract_meta(raw: list) -> tuple[int | None, str | None]:
 
 
 def list_library(client: httpx.Client) -> list[LibraryBook]:
-    """枚舉整個書庫（自動分頁，直到取齊總數或無法再前進）。"""
+    """枚舉整個書庫（自動分頁，直到取齊總數或無法再前進）。
+
+    回應宣告了總數卻取不齊（無法再翻頁、游標重複、到達頁數上限）時丟
+    IncompleteLibrary，避免把部分書庫當成完整結果。
+    """
     books: list[LibraryBook] = []
     seen: set[str] = set()
     token: str | None = None
+    total: int | None = None
     for _ in range(_MAX_PAGES):
         raw = _call(client, LIBRARY_METHOD, _library_body(token))
         page = _parse_library(raw)
@@ -196,13 +205,18 @@ def list_library(client: httpx.Client) -> list[LibraryBook]:
         books.extend(new)
 
         total, next_token = _extract_meta(raw)
-        if not new:  # 沒有新書，停
-            break
         if total is not None and len(books) >= total:  # 已取齊
+            return books
+        if not new:  # 沒有新書，停
             break
         if not next_token or next_token == token:  # 沒有游標或無法前進
             break
         token = next_token
+    if total is not None and len(books) < total:
+        raise IncompleteLibrary(
+            f"書庫分頁未取齊：回應宣告共 {total} 本，只取得 {len(books)} 本；"
+            "未寫入 manifest，請稍後重試，持續發生請執行 doctor"
+        )
     return books
 
 
@@ -261,7 +275,10 @@ def _parse_download_block(block) -> list[ExportOption]:
         if not isinstance(entry, list) or len(entry) < 2:
             continue
         if len(entry) == 2:  # 無 DRM 直接下載
-            url, fmt = entry[1], _FMT_CODE.get(entry[0], "epub")
+            fmt = _FMT_CODE.get(entry[0])
+            if fmt is None:  # 未知格式碼：不猜成 EPUB（fail closed），略過
+                continue
+            url = entry[1]
         else:  # ACSM（DRM）
             url, fmt = entry[-1], "acsm"
         if isinstance(url, str) and url:

@@ -88,7 +88,6 @@ _EN: dict[str, str] = {
         "Show cover thumbnails (fetched online, cached in output/.cover_cache)",
     # 關於對話框
     "版本": "Version",
-    "作者": "Author",
     "授權": "License",
     "枚舉並批次匯出 Google Play 圖書：無 DRM 書下載 EPUB/PDF，"
     "DRM 書下載官方 .acsm 供 Adobe Digital Editions 閱讀。<br>"
