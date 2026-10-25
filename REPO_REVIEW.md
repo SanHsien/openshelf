@@ -93,12 +93,12 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 建議優先補下列 mock-httpx / fake-client 測試：
 
-- [ ] `scan` 新增書、更新 metadata、保留既有已下載檔案。
-- [ ] `export` EPUB 失敗後改試 PDF，成功後正確更新 manifest。
-- [ ] 下載或覆核失敗時不覆蓋舊檔，且保留可診斷的 `note`。
-- [ ] `refresh_acsm` / `force_refresh_acsm` / `limit` / 已送出 ACSM 的組合行為。
-- [ ] GUI 取消時停止在安全邊界，不留下半寫 manifest 或 `.part` 檔。
-- [ ] 401 / 403 中止整批並顯示重新登入提示。
+- [x] `scan` 新增書、更新 metadata、保留既有已下載檔案。（2026-10-25，`1038d95`）
+- [x] `export` EPUB 失敗後改試 PDF，成功後正確更新 manifest。（2026-10-25，`1038d95`）
+- [x] 下載或覆核失敗時不覆蓋舊檔，且保留可診斷的 `note`。（2026-10-25，`1038d95`）
+- [ ] `refresh_acsm` / `force_refresh_acsm` / `limit` / 已送出 ACSM 的組合行為。（僅「重抓失敗保留舊檔」一條路徑已測，`1038d95`；其餘組合仍待補）
+- [ ] GUI 取消時停止在安全邊界，不留下半寫 manifest 或 `.part` 檔。（僅測 `should_stop` 在第一本前生效，`1038d95`；GUI 實際取消流程仍待補）
+- [ ] 401 / 403 中止整批並顯示重新登入提示。（僅測 401 中止整批，`1038d95`；403 與 CLI 提示訊息仍待補）
 
 ### P2：`scan` 只合併，不處理已不在當次書庫中的舊項目
 
@@ -120,8 +120,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 建議：
 
-- [ ] 移除重複字典鍵並拆開測試中的分號敘述。
-- [ ] 在開發相依與 CI 加入 `ruff check .`。
+- [x] 移除重複字典鍵並拆開測試中的分號敘述。（2026-10-25，`1038d95`）
+- [x] 在開發相依與 CI 加入 `ruff check .`。（2026-10-25，`1038d95`；規則限 E4/E7/E9/F，新增 `lint` extra）
 - [ ] 可再加 `python -m compileall` 與 wheel build，確保發佈面持續可安裝。
 
 ### P2：登入態含敏感 cookie，但存檔後沒有權限強化
@@ -129,6 +129,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 證據：`openshelf/browser.py:90` 直接寫出 `storage_state.json`；`.gitignore` 已正確排除，但程式沒有在存檔後限制檔案權限，也沒有在 `doctor` 中檢查權限。
 
 影響：這不是遠端漏洞，但在共用電腦、寬鬆 umask、備份同步或其他本機帳號可讀的環境中，登入態可能被非預期存取。
+
+修復紀錄（2026-10-25，`1038d95`）：存檔後 best-effort `chmod 600` 已完成；`doctor` 檢查與 Windows ACL 仍待做。
 
 建議：
 
@@ -149,6 +151,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 證據：`openshelf/service.py:231-250` 將書名、作者、出版社與備註原樣寫入 CSV，README 又明確讓使用者用 Excel 開啟。實測 `=HYPERLINK(...)` 會原樣成為 CSV 第一欄。
 
 影響：以 `=`、`+`、`-`、`@` 開頭的遠端 metadata 可能被試算表視為公式。來源通常是出版社 metadata，風險不高，但輸出層可以低成本消除。
+
+修復紀錄（2026-10-25，`1038d95`）：`write_csv` 對 `= + - @` 與 tab／CR 開頭的欄位加前置單引號，manifest 保留原值；註：volume_id 若以 `-` 開頭也會被加引號。
 
 建議：只在 CSV 輸出層對危險開頭加前置單引號，manifest 仍保留原值；補公式注入測試。HTML 路徑已使用 `html.escape`，本項不影響 HTML 報表。
 
@@ -177,7 +181,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 修復紀錄（2026-10-25，commit `1038d95`）：
 - 檔名碰撞：`service._filename_key` 以正規化後檔名（casefold）分組，撞名時沿用年份／出版社／volume_id 辨識；測試 `tests/test_service_flow.py::test_colliding_normalized_names_do_not_overwrite`。
 - 未知格式：`playbooks._parse_download_block` 略過未知格式碼；測試 `UnknownFormat`。
-- 分頁：`list_library` 在 total 已知卻取不齊（無游標、游標重複、頁數上限）時丟 `IncompleteLibrary`，`scan` 不寫 manifest；CLI 轉成 ClickException。
+- 分頁（`d855a9a` 補強：後頁不再帶總數時沿用最大值）：`list_library` 在 total 已知卻取不齊（無游標、游標重複、頁數上限）時丟 `IncompleteLibrary`，`scan` 不寫 manifest；CLI 轉成 ClickException。
 - 整合測試：scan 保留既有下載、EPUB 失敗改 PDF、失敗標 failed 且無 `.part`、重抓失敗保留舊檔、401 中止整批、取消。
 - 另修：`ui/i18n.py` 重複鍵 `作者`、`tests/test_service.py` 分號敘述（P2 lint 項）。
 
@@ -209,8 +213,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [x] 未知下載格式改成 fail closed。（2026-10-25，`1038d95`）
 - [x] 分頁未取齊時明確失敗，不提交部分 manifest。（2026-10-25，`1038d95`）
 - [x] 決定並實作「斷開歷史後首次發版」策略，避免依賴自動 compare notes。（2026-08-09，`dd4ffe4`；workflow preflight 仍待補）
-- [x] 補 `scan` / `export` 主流程整合測試。（2026-10-25，`1038d95`；GUI 取消僅測 `should_stop` 路徑）
-- [x] 清掉 Ruff 問題，將 lint 加入 CI。（2026-10-25，`1038d95`；規則限 E4/E7/E9/F）
+- [ ] 補 `scan` / `export` 主流程整合測試。（部分完成，`1038d95`：主路徑已測；P1 清單中 refresh 組合、GUI 取消、403 與提示訊息仍待補）
+- [x] 清掉 Ruff 問題，將 lint 加入 CI。（2026-10-25，`1038d95`；規則限 E4/E7/E9/F；compileall／wheel build 仍待補）
 - [x] 更新 README 的測試敘述。（2026-08-09，`dd4ffe4`）
 
 ### 下一個維護週期
