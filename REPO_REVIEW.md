@@ -106,7 +106,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 影響：若書籍被退款、移除、區域權限改變，或端點只回傳不完整資料，報表總數可能永久保留舊項目。直接刪除也不安全，因為短暫端點異常可能造成誤刪紀錄。
 
-修復紀錄（2026-10-25，`707c87d`）：維護者決定採「已下架」標記。`BookEntry` 新增 `in_library`／`last_seen_at`；完整 scan 成功後未見項目標成 `in_library=false`，回到書庫自動恢復；`IncompleteLibrary`、無總數、空回應、或一次超過一半不在書庫（本機有效書籍 ≥10 本時）都不標記；`export` 略過已下架；報表、HTML、CSV、CLI 狀態表列出。不刪書目、不刪檔案。測試見 `tests/test_service_flow.py::InactiveSync`。維護者另決定：資料夾位置維持現狀，不做跨平台資料目錄調整（原 P2「macOS／Linux 資料放 executable 旁」不處理）。
+修復紀錄（2026-10-25，`707c87d`、誤標防護 `5e4a04c`）：維護者決定採「已下架」標記。`BookEntry` 新增 `in_library`／`last_seen_at`；完整 scan 成功後未見項目標成 `in_library=false`，回到書庫自動恢復；`IncompleteLibrary`、無總數、空回應、或一次超過一半不在書庫（本機有效書籍 ≥10 本時）都不標記；`export` 略過已下架；報表、HTML、CSV、CLI 狀態表列出。不刪書目、不刪檔案。測試見 `tests/test_service_flow.py::InactiveSync`。維護者另決定：資料夾位置維持現狀，不做跨平台資料目錄調整（原 P2「macOS／Linux 資料放 executable 旁」不處理）。
 
 建議：明確定義同步政策。較安全的做法是增加 `last_seen_at` / `in_library`，完整 scan 成功後把未見項目標成 inactive，報表預設分開列示；不要自動刪除已下載檔案。
 

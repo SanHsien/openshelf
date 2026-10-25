@@ -39,7 +39,7 @@ Highlights:
 - **No password handling**: you complete sign-in yourself in a real browser; the program only reuses the resulting session.
 - **HTTP-first after login**: library enumeration and downloads use backend requests instead of fragile DOM automation.
 - **Resumable**: `manifest.json` is the local state record, so interrupted runs do not have to start over.
-- **Removed-book marking**: after a complete scan, books that Google no longer lists are marked as removed (`in_library=false`); their records and downloaded files are kept and no download is attempted. They are restored automatically if they return. Nothing is marked unless the scan is confirmed complete (the response declares a total and all of it was fetched); incomplete scans, responses without a total, empty responses, or more than half of the local library vanishing at once are all skipped.
+- **Removed-book marking**: after a complete scan, books that Google no longer lists are marked as removed (`in_library=false`); their records and downloaded files are kept and no download is attempted. They are restored automatically if they return. Nothing is marked unless the scan is confirmed complete (the response declares a total and all of it was fetched); incomplete scans, responses without a total, empty responses, or more than half of a local library of 10+ active books vanishing at once are all skipped.
 - **GUI + CLI**: a desktop app for normal use and an `openshelf` command for automation and diagnostics.
 - **Reports and handoff**: TXT / CSV / HTML reports plus separate EPUB/PDF, ACSM, and Calibre handoff flows.
 
