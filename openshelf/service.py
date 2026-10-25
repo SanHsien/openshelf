@@ -18,7 +18,7 @@ from typing import Callable
 
 from .classify import classify
 from .config import Config
-from .export import download_option, safe_filename
+from .export import _MAX_DISAMBIGUATOR, clean_part, download_option, safe_filename
 from .logsetup import get_logger
 from .manifest import BookEntry, Manifest, now_iso
 from .playbooks import ExportOption, list_library, list_library_checked
@@ -87,20 +87,31 @@ def _filename_key(entry: BookEntry) -> str:
     return safe_filename(entry.title, entry.author, "x").casefold()
 
 
+def _disambig_key(entry: BookEntry) -> tuple[str, str]:
+    """檔名層級的 (年, 出版社)：經清理與 casefold，與實際落地的檔名一致。"""
+    return (
+        clean_part(_year(entry.published)).casefold(),
+        clean_part(entry.publisher or "").casefold(),
+    )
+
+
 def _disambiguator(entry: BookEntry, group: list[BookEntry]) -> str | None:
     """同名（書名+作者）多本時的檔名辨識：以『出版年 · 出版社』區別；
-    年＋出版社仍相同才補 volume_id，確保檔名唯一不互相覆蓋。"""
+    年＋出版社（以檔名層級比較）仍相同才補 volume_id，確保檔名唯一不互相覆蓋。
+    出版社過長時先截斷出版社，volume_id 永遠完整保留。"""
     if len(group) <= 1:
         return None
     year, pub = _year(entry.published), (entry.publisher or "").strip()
+    key = _disambig_key(entry)
+    need_id = sum(1 for b in group if _disambig_key(b) == key) > 1
+    tail = f" · {entry.volume_id}" if need_id else ""
     parts = [p for p in (year, pub) if p]
-    key = (year, pub)
-    same = sum(
-        1 for b in group if (_year(b.published), (b.publisher or "").strip()) == key
-    )
-    if same > 1:  # 年＋出版社也撞，補 volume_id
-        parts.append(entry.volume_id)
-    return " · ".join(parts) if parts else entry.volume_id
+    head = " · ".join(parts)
+    if need_id:
+        room = _MAX_DISAMBIGUATOR - len(tail)
+        head = head[: max(room, 0)].rstrip(". ")
+        return (head + tail) if head else entry.volume_id
+    return head or entry.volume_id
 
 
 def _is_stale_acsm(entry: BookEntry, cfg: Config) -> bool:

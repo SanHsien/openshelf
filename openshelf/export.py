@@ -26,28 +26,39 @@ BOOK_MIN_BYTES = 16 * 1024  # 書檔通常遠大於此
 # 書檔的檔頭魔術位元組（.acsm 不檢視內容，故不列入）
 _MAGIC = {"epub": b"PK\x03\x04", "pdf": b"%PDF-"}
 
-_ILLEGAL = re.compile(r'[\\/:*?"<>|\n\r\t]+')
+_ILLEGAL = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
+# Windows 保留裝置名（含任意副檔名也不能當檔名）
+_RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
+             *(f"LPT{i}" for i in range(1, 10))}
 _MAX_STEM = 180
 _MAX_DISAMBIGUATOR = 80
+
+
+def clean_part(text: str) -> str:
+    """把一段文字清成可放進檔名的形式（非法字元換底線、去頭尾空白）。"""
+    return _ILLEGAL.sub("_", text).strip()
 
 
 def safe_filename(
     title: str, author: str, ext: str, disambiguator: str | None = None
 ) -> str:
-    title = _ILLEGAL.sub("_", title).strip() or "untitled"
-    author = _ILLEGAL.sub("_", author).strip()
+    title = clean_part(title) or "untitled"
+    author = clean_part(author)
     base = f"{title} - {author}" if author else title
     suffix = ""
     if disambiguator:
-        disambiguator = _ILLEGAL.sub("_", disambiguator).strip()
+        disambiguator = clean_part(disambiguator)
         if disambiguator:
             disambiguator = disambiguator[:_MAX_DISAMBIGUATOR].rstrip(". ")
             suffix = f" [{disambiguator}]"
     if suffix:
         base_limit = max(1, _MAX_STEM - len(suffix))
-        stem = base[:base_limit].rstrip(". ") + suffix
+        head = base[:base_limit].rstrip(". ") or "untitled"
+        stem = head + suffix
     else:
-        stem = base[:_MAX_STEM].rstrip(". ")  # 避免過長與結尾點
+        stem = base[:_MAX_STEM].rstrip(". ") or "untitled"  # 避免過長、結尾點與全點號
+    if stem.split(".")[0].rstrip().upper() in _RESERVED:
+        stem = "_" + stem  # CON.epub 這類在 Windows 上是裝置名
     return f"{stem}.{ext}"
 
 
