@@ -106,6 +106,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 影響：若書籍被退款、移除、區域權限改變，或端點只回傳不完整資料，報表總數可能永久保留舊項目。直接刪除也不安全，因為短暫端點異常可能造成誤刪紀錄。
 
+修復紀錄（2026-10-25，`707c87d`）：維護者決定採「已下架」標記。`BookEntry` 新增 `in_library`／`last_seen_at`；完整 scan 成功後未見項目標成 `in_library=false`，回到書庫自動恢復；`IncompleteLibrary` 或空回應不標記；`export` 略過已下架；報表、HTML、CSV、CLI 狀態表列出。不刪書目、不刪檔案。測試見 `tests/test_service_flow.py::InactiveSync`。維護者另決定：資料夾位置維持現狀，不做跨平台資料目錄調整（原 P2「macOS／Linux 資料放 executable 旁」不處理）。
+
 建議：明確定義同步政策。較安全的做法是增加 `last_seen_at` / `in_library`，完整 scan 成功後把未見項目標成 inactive，報表預設分開列示；不要自動刪除已下載檔案。
 
 ### P2：CI 沒有 lint gate，現況已有可偵測錯誤
@@ -219,9 +221,9 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 ### 下一個維護週期
 
-- [ ] 定義 manifest 對已移除書籍的同步政策。
+- [x] 定義 manifest 對已移除書籍的同步政策。（2026-10-25，`707c87d`；維護者決定：標記「已下架」、保留資料與檔案）
 - [ ] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` 提示仍待做）
-- [ ] 把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。
+- [ ] ~~把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。~~（2026-10-25 維護者決定維持現狀，不調整資料夾位置）
 - [x] 防護 CSV 公式注入。（2026-10-25，`1038d95`）
 - [ ] 在既有依賴 freshness tracker 之上，導入 Release constraints / SBOM 與打包產物 smoke test。
 - [ ] 視協作需求啟用 branch protection、secret scanning 與 CodeQL。
