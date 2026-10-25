@@ -49,3 +49,10 @@ class ConfigTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExplicitConfigTest(unittest.TestCase):
+    def test_missing_explicit_config_is_an_error(self):
+        missing = Path(tempfile.mkdtemp()) / "typo.toml"
+        with self.assertRaises(FileNotFoundError):
+            load_config(missing)

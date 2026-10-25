@@ -24,7 +24,10 @@ console = Console()
 @click.pass_context
 def main(ctx: click.Context, config_path: str | None) -> None:
     ctx.ensure_object(dict)
-    ctx.obj["config"] = load_config(config_path)
+    try:
+        ctx.obj["config"] = load_config(config_path)
+    except FileNotFoundError as e:
+        raise click.UsageError(str(e))
 
 
 @main.command(help="開啟瀏覽器手動登入一次，保存登入態。")

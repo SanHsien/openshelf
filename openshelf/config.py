@@ -62,6 +62,9 @@ def load_config(config_path: str | Path | None = None) -> Config:
     root = _project_root()
     path = Path(config_path) if config_path else root / DEFAULT_CONFIG_NAME
 
+    if config_path and not path.is_file():
+        raise FileNotFoundError(f"找不到設定檔：{path}")
+
     data = dict(_DEFAULTS)
     if path.is_file():
         with path.open("rb") as fh:
