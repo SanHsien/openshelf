@@ -192,6 +192,14 @@ def list_library(client: httpx.Client) -> list[LibraryBook]:
     回應宣告了總數卻取不齊（無法再翻頁、游標重複、到達頁數上限）時丟
     IncompleteLibrary，避免把部分書庫當成完整結果。
     """
+    return list_library_checked(client)[0]
+
+
+def list_library_checked(client: httpx.Client) -> tuple[list[LibraryBook], bool]:
+    """同 list_library，另回傳「是否確認取齊」：回應有宣告總數且已取到該數量才為 True。
+
+    回應沒有總數時無法證明完整，結果仍可用於下載，但不得據以判定書已下架。
+    """
     books: list[LibraryBook] = []
     seen: set[str] = set()
     token: str | None = None
@@ -208,7 +216,7 @@ def list_library(client: httpx.Client) -> list[LibraryBook]:
         if page_total is not None:  # 後頁若不再帶總數，沿用先前看到的最大值
             total = max(total or 0, page_total)
         if total is not None and len(books) >= total:  # 已取齊
-            return books
+            return books, True
         if not new:  # 沒有新書，停
             break
         if not next_token or next_token == token:  # 沒有游標或無法前進
@@ -219,7 +227,7 @@ def list_library(client: httpx.Client) -> list[LibraryBook]:
             f"書庫分頁未取齊：回應宣告共 {total} 本，只取得 {len(books)} 本；"
             "未寫入 manifest，請稍後重試，持續發生請執行 doctor"
         )
-    return books
+    return books, False
 
 
 def _parse_library(raw: list) -> list[LibraryBook]:

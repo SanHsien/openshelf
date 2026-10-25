@@ -130,6 +130,19 @@ class InactiveSync(_Env):
         m = Manifest.load(self.out / "manifest.json")
         self.assertTrue(all(b.in_library for b in m.books.values()))
 
+    def test_response_without_total_does_not_mark_inactive(self):
+        self._seed(["A", "B"])
+        lib = [[_lib_book("A", "書A")], None, None]  # 沒有總數：無法證明取齊
+        self._patch_client(lambda req: httpx.Response(200, json=lib))
+        res = service.scan(self.cfg, log=lambda s: None)
+        self.assertTrue(all(b.in_library for b in res.manifest.books.values()))
+
+    def test_bulk_removal_is_treated_as_suspicious(self):
+        ids = [f"V{i}" for i in range(12)]
+        self._seed(ids)
+        res = self._scan(ids[:4])  # 一次 8/12 不在書庫
+        self.assertTrue(all(b.in_library for b in res.manifest.books.values()))
+
     def test_empty_response_does_not_mark_everything_inactive(self):
         self._seed(["A", "B"])
         self._patch_client(lambda req: httpx.Response(200, json=[[], None, None]))

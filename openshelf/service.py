@@ -21,7 +21,7 @@ from .config import Config
 from .export import download_option, safe_filename
 from .logsetup import get_logger
 from .manifest import BookEntry, Manifest, now_iso
-from .playbooks import ExportOption, list_library
+from .playbooks import ExportOption, list_library, list_library_checked
 from .session import SessionExpired, build_client
 
 # log(訊息)；progress(已處理, 總數)；status(目前書名)；should_stop() -> bool（GUI 取消用）
@@ -350,6 +350,9 @@ class ExportResult:
     failed: int = 0
 
 
+_BULK_GUARD_MIN = 10  # 本機有效書籍達此數量時，才啟用「一次下架超過一半就略過」的保護
+
+
 def scan(cfg: Config, log: LogCb | None = None) -> ScanResult:
     """枚舉書庫、分類並寫入 manifest。回傳 manifest 與本次取得的匯出選項快取。"""
     log = _tee_log(cfg, log)
@@ -358,7 +361,7 @@ def scan(cfg: Config, log: LogCb | None = None) -> ScanResult:
 
     client = build_client(cfg)
     with client:
-        books = list_library(client)
+        books, complete = list_library_checked(client)
         for lb in books:
             options = lb.export_options
             category = classify(options)
@@ -375,13 +378,21 @@ def scan(cfg: Config, log: LogCb | None = None) -> ScanResult:
             option_cache[lb.volume_id] = options
             log(f"枚舉：{entry.title or lb.volume_id} → {category}")
 
-    # 完整 scan（分頁未取齊會在上面丟例外）才同步下架狀態；空回應不可信，不據以標記
-    if books:
-        gone = manifest.mark_library_sync({lb.volume_id for lb in books})
-        for vid in gone:
+    # 只有「確認取齊」（回應宣告總數且已取到）才同步下架狀態；
+    # 沒有總數、空回應、或一次要標下大半本機書籍，都視為不可信而略過
+    seen = {lb.volume_id for lb in books}
+    active = [v for v, b in manifest.books.items() if b.in_library]
+    missing = [v for v in active if v not in seen]
+    if not books:
+        if manifest.books:
+            log("警告：書庫回應為空，略過下架標記。")
+    elif not complete:
+        log("警告：書庫回應沒有總數，無法確認取齊，略過下架標記。")
+    elif len(active) >= _BULK_GUARD_MIN and len(missing) * 2 > len(active):
+        log(f"警告：一次有 {len(missing)}/{len(active)} 本不在書庫，疑似異常，略過下架標記。")
+    else:
+        for vid in manifest.mark_library_sync(seen):
             log(f"已下架（Google 書庫不再有，本機保留）：{manifest.books[vid].title or vid}")
-    elif manifest.books:
-        log("警告：書庫回應為空，略過下架標記。")
 
     manifest.save()
     log(f"報表已寫入：{write_report(manifest, cfg)}")
