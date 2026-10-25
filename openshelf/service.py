@@ -168,6 +168,7 @@ def write_report(manifest: Manifest, cfg: Config) -> Path:
     no_export = [b for b in books if b.category == "no_export"]
     failed = [b for b in books if b.category == "failed"]
     stale = [b for b in books if b.file_path and _is_stale_acsm(b, cfg)]
+    inactive = [b for b in books if not b.in_library]
 
     lines: list[str] = []
     add = lines.append
@@ -182,6 +183,8 @@ def write_report(manifest: Manifest, cfg: Config) -> Path:
     add(f"  已下載 DRM（.acsm，需 ADE 開啟）：{len(acsm)}")
     add(f"  無法匯出（只記錄）：{len(no_export)}")
     add(f"  失敗（未取得書檔）：{len(failed)}")
+    if inactive:
+        add(f"  已下架（Google 書庫已移除，本機保留）：{len(inactive)}")
     if stale:
         add(f"  ⚠ .acsm 逾 {cfg.acsm_valid_days} 天（建議重抓）：{len(stale)}")
     add("")
@@ -204,6 +207,12 @@ def write_report(manifest: Manifest, cfg: Config) -> Path:
         add("  （無）")
     add("")
 
+    if inactive:
+        add("【已下架（最近一次完整掃描時 Google 書庫已不含；資料與檔案仍保留）】")
+        for b in inactive:
+            add(f"  - {_book_label(b)}")
+        add("")
+
     if stale:
         add("【.acsm 逾時，建議 openshelf export --refresh-acsm 重抓】")
         for b in stale:
@@ -222,7 +231,7 @@ HTML_NAME = "書庫報表.html"
 
 _CSV_HEADERS = (
     "書名", "作者", "出版社", "出版日期", "分類",
-    "檔案", "下載時間", "備註", "volume_id",
+    "檔案", "下載時間", "備註", "volume_id", "書庫狀態",
 )
 _CATEGORY_ZH = {
     "drm_free": "無 DRM（EPUB/PDF）",
@@ -238,6 +247,7 @@ def _row_values(b: BookEntry) -> tuple[str, ...]:
         b.title or "", b.author or "", b.publisher or "", b.published or "",
         _CATEGORY_ZH.get(b.category, b.category), b.file_path or "",
         b.downloaded_at or "", b.note or "", b.volume_id,
+        "在書庫" if b.in_library else "已下架",
     )
 
 
@@ -282,7 +292,7 @@ def write_html(manifest: Manifest, cfg: Config) -> Path:
     stats = (
         f"總計 {c.get('total', 0)}｜無 DRM {c.get('drm_free', 0)}｜"
         f"ACSM {c.get('acsm', 0)}｜無法匯出 {c.get('no_export', 0)}｜"
-        f"失敗 {c.get('failed', 0)}"
+        f"失敗 {c.get('failed', 0)}｜已下架 {c.get('inactive', 0)}"
     )
     if stale:
         stats += f"｜⚠ .acsm 逾時 {stale}"
@@ -365,6 +375,14 @@ def scan(cfg: Config, log: LogCb | None = None) -> ScanResult:
             option_cache[lb.volume_id] = options
             log(f"枚舉：{entry.title or lb.volume_id} → {category}")
 
+    # 完整 scan（分頁未取齊會在上面丟例外）才同步下架狀態；空回應不可信，不據以標記
+    if books:
+        gone = manifest.mark_library_sync({lb.volume_id for lb in books})
+        for vid in gone:
+            log(f"已下架（Google 書庫不再有，本機保留）：{manifest.books[vid].title or vid}")
+    elif manifest.books:
+        log("警告：書庫回應為空，略過下架標記。")
+
     manifest.save()
     log(f"報表已寫入：{write_report(manifest, cfg)}")
     return ScanResult(manifest=manifest, option_cache=option_cache)
@@ -422,6 +440,8 @@ def export(
             if should_stop():
                 log("已取消。")
                 break
+            if not entry.in_library:  # 已下架：保留資料與檔案，不再嘗試下載
+                continue
             if skip_failed and entry.category == "failed":
                 continue
             if only_failed and entry.category != "failed":

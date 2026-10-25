@@ -329,6 +329,8 @@ def _print_counts(manifest: Manifest, cfg=None) -> None:
     }
     for key, label in labels.items():
         table.add_row(label, str(c.get(key, 0)))
+    if c.get("inactive"):
+        table.add_row("已下架（本機保留）", str(c["inactive"]))
     table.add_row("[bold]總計[/bold]", f"[bold]{c.get('total', 0)}[/bold]")
     console.print(table)
 

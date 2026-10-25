@@ -86,6 +86,90 @@ class ScanFlow(_Env):
         self.assertFalse((self.out / "manifest.json").exists())
 
 
+class InactiveSync(_Env):
+    def _seed(self, ids):
+        from openshelf.manifest import BookEntry
+
+        m = Manifest(self.out / "manifest.json")
+        for vid in ids:
+            m.upsert(BookEntry(volume_id=vid, title=f"書{vid}", category="drm_free",
+                               file_path=f"{vid}.epub"))
+        m.save()
+        for vid in ids:
+            (self.out / f"{vid}.epub").write_bytes(EPUB)
+
+    def _scan(self, ids):
+        lib = [[_lib_book(v, f"書{v}") for v in ids], [len(ids)], None]
+        self._patch_client(lambda req: httpx.Response(200, json=lib))
+        return service.scan(self.cfg, log=lambda s: None)
+
+    def test_removed_book_marked_inactive_but_kept(self):
+        self._seed(["A", "B"])
+        res = self._scan(["A"])
+        b = res.manifest.get("B")
+        self.assertFalse(b.in_library)
+        self.assertEqual(b.file_path, "B.epub")  # 資料保留
+        self.assertTrue((self.out / "B.epub").exists())  # 檔案保留
+        self.assertTrue(res.manifest.get("A").in_library)
+        self.assertEqual(res.manifest.counts()["inactive"], 1)
+        self.assertEqual(res.manifest.counts()["total"], 2)
+
+    def test_book_returning_to_library_is_active_again(self):
+        self._seed(["A", "B"])
+        self._scan(["A"])
+        res = self._scan(["A", "B"])
+        self.assertTrue(res.manifest.get("B").in_library)
+        self.assertTrue(res.manifest.get("B").last_seen_at)
+
+    def test_incomplete_scan_does_not_mark_inactive(self):
+        self._seed(["A", "B"])
+        lib = [[_lib_book("A", "書A")], [99], None]
+        self._patch_client(lambda req: httpx.Response(200, json=lib))
+        with self.assertRaises(IncompleteLibrary):
+            service.scan(self.cfg, log=lambda s: None)
+        m = Manifest.load(self.out / "manifest.json")
+        self.assertTrue(all(b.in_library for b in m.books.values()))
+
+    def test_empty_response_does_not_mark_everything_inactive(self):
+        self._seed(["A", "B"])
+        self._patch_client(lambda req: httpx.Response(200, json=[[], None, None]))
+        res = service.scan(self.cfg, log=lambda s: None)
+        self.assertTrue(all(b.in_library for b in res.manifest.books.values()))
+
+    def test_export_skips_inactive_books(self):
+        from openshelf.manifest import BookEntry
+
+        m = Manifest(self.out / "manifest.json")
+        m.upsert(BookEntry(volume_id="X", title="書X", in_library=False))
+        m.save()
+        calls = []
+        self._patch_client(lambda req: calls.append(1) or httpx.Response(200, content=EPUB))
+        cache = {"X": [ExportOption(fmt="epub", url="https://x/x")]}
+        res = service.export(self.cfg, "epub", True, option_cache=cache, log=lambda s: None)
+        self.assertEqual((res.done, res.failed, calls), (0, 0, []))
+
+    def test_reports_show_inactive(self):
+        self._seed(["A", "B"])
+        res = self._scan(["A"])
+        text = (self.out / service.REPORT_NAME).read_text(encoding="utf-8-sig")
+        self.assertIn("已下架", text)
+        import csv
+
+        with service.write_csv(res.manifest, self.cfg).open(encoding="utf-8-sig", newline="") as fh:
+            rows = {r[8]: r for r in csv.reader(fh)}
+        self.assertEqual(rows["B"][9], "已下架")
+        self.assertEqual(rows["A"][9], "在書庫")
+
+    def test_old_manifest_without_new_fields_loads(self):
+        import json
+
+        (self.out / "manifest.json").write_text(json.dumps(
+            {"books": {"A": {"volume_id": "A", "title": "舊", "future_field": 1}}}),
+            encoding="utf-8")
+        e = Manifest.load(self.out / "manifest.json").get("A")
+        self.assertTrue(e.in_library)
+
+
 class ExportFlow(_Env):
     def _manifest(self, books):
         m = Manifest(self.out / "manifest.json")

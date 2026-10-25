@@ -6,6 +6,9 @@
     no_export  無任何匯出選項，只記錄
     failed     流程出錯，待重試
     pending    已枚舉、尚未下載（scan 後、export 前的暫態）
+
+另有獨立於分類的 in_library 旗標：完整 scan 成功後，Google 書庫已不再出現的書
+標成 in_library=False（報表稱「已下架」）。只標記、不刪資料、不刪已下載檔案。
 """
 
 from __future__ import annotations
@@ -42,6 +45,8 @@ class BookEntry:
     acsm_opened_at: str = ""  # 送交 ADE / 系統預設程式的時間；非 ADE 成功匯入確認
     note: str = ""
     updated_at: str = field(default_factory=_now)
+    in_library: bool = True  # False＝最近一次完整 scan 時 Google 書庫已不含此書（已下架）
+    last_seen_at: str = ""  # 最近一次在 Google 書庫看到的時間
 
     def touch(self) -> None:
         self.updated_at = _now()
@@ -60,8 +65,9 @@ class Manifest:
         m = cls(path)
         if m.path.is_file():
             raw = json.loads(m.path.read_text(encoding="utf-8"))
+            known = set(BookEntry.__dataclass_fields__)
             for vid, entry in raw.get("books", {}).items():
-                m.books[vid] = BookEntry(**entry)
+                m.books[vid] = BookEntry(**{k: v for k, v in entry.items() if k in known})
         return m
 
     def save(self) -> None:
@@ -84,6 +90,22 @@ class Manifest:
         self.books[entry.volume_id] = entry
         return entry
 
+    def mark_library_sync(self, seen_ids: set[str]) -> list[str]:
+        """依完整 scan 的結果同步 in_library：看到的設 True 並記時間，沒看到的設 False。
+
+        只標記，不刪除任何書目或檔案。回傳「本次新變成已下架」的 volume_id。
+        """
+        now = _now()
+        newly_inactive: list[str] = []
+        for vid, b in self.books.items():
+            if vid in seen_ids:
+                b.in_library = True
+                b.last_seen_at = now
+            elif b.in_library:
+                b.in_library = False
+                newly_inactive.append(vid)
+        return newly_inactive
+
     def get(self, volume_id: str) -> BookEntry | None:
         return self.books.get(volume_id)
 
@@ -100,4 +122,5 @@ class Manifest:
         for b in self.books.values():
             result[b.category] = result.get(b.category, 0) + 1
         result["total"] = len(self.books)
+        result["inactive"] = sum(1 for b in self.books.values() if not b.in_library)
         return result
