@@ -129,6 +129,10 @@ def download_option(
             if tmp.exists():
                 tmp.unlink()
             last_err = e
+        except BaseException:  # 磁碟滿、中斷等：不留半成品 .part
+            if tmp.exists():
+                tmp.unlink()
+            raise
         if attempt < attempts - 1:
             time.sleep(2 ** attempt)  # 1s, 2s, 4s…
     raise last_err if last_err else RuntimeError("下載失敗")
