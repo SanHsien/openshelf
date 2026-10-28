@@ -3,10 +3,6 @@
     "playwright": {
       "deferredLatest": "1.64.1",
       "reason": "Playwright only runs the one-time login; 1.64.0 covers it and 1.64.1 is a patch release nothing here needs. Raising the floor alone was declined in PR #24 (2026-09-28); reviewed again 2026-10-25."
-    },
-    "setuptools": {
-      "deferredLatest": "84.2.1",
-      "reason": "Build-backend floor only; 84.0.0 builds the wheel, and nothing from 84.1/84.2 is needed. Reviewed 2026-10-25."
     }
   }
 }
