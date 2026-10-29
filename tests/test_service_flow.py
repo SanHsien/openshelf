@@ -2,6 +2,8 @@
 
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
+from itertools import product
 from pathlib import Path
 from unittest import mock
 
@@ -277,6 +279,125 @@ class ExportFlow(_Env):
         self.assertEqual(res.done, 0)
         self.assertEqual(list(self.out.glob("*.epub")), [])
         self.assertEqual(list(self.out.glob("*.part")), [])
+
+
+class AcsmRefreshFlow(_Env):
+    def _seed(self, out, *, stale, opened):
+        from openshelf.manifest import BookEntry
+
+        out.mkdir(parents=True, exist_ok=True)
+        m = Manifest(out / "manifest.json")
+        downloaded = (datetime.now(timezone.utc) - timedelta(days=10 if stale else 1)).isoformat()
+        for vid in "ABC":
+            entry = BookEntry(
+                volume_id=vid, title=f"書{vid}", category="acsm",
+                file_path=f"書{vid}.acsm", downloaded_at=downloaded,
+                acsm_opened_at=downloaded if opened and vid == "A" else "",
+                note="上次重抓失敗",
+            )
+            m.upsert(entry)
+            (out / entry.file_path).write_bytes(b"old opaque credential")
+        m.save()
+        return m
+
+    def _export(self, out, *, failure=False, **kwargs):
+        calls = []
+
+        def handler(req):
+            calls.append(req.url.path.strip("/"))
+            return httpx.Response(500 if failure else 200, content=b"new opaque credential")
+
+        cache = {v: [ExportOption(fmt="acsm", url=f"https://x/{v}")] for v in "ABC"}
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with mock.patch.object(service, "build_client", return_value=client):
+            result = service.export(
+                _cfg(out), "epub", True, option_cache=cache, log=lambda s: None, **kwargs,
+            )
+        return result, calls, Manifest.load(out / "manifest.json")
+
+    def _assert_refresh_matrix(self, refresh, force, expected):
+        # expected 明列 (逾時, 已送出) 各情境應下載的順序，不呼叫待測 helper 算答案。
+        for stale, opened, limit in product((False, True), (False, True), (None, 1, 2)):
+            with self.subTest(stale=stale, opened=opened, limit=limit):
+                out = self.out / f"{stale}-{opened}-{limit}"
+                before = self._seed(out, stale=stale, opened=opened)
+                wanted = expected[stale, opened][:limit]
+                result, calls, after = self._export(
+                    out, refresh_acsm=refresh, force_refresh_acsm=force, limit=limit,
+                )
+                self.assertEqual(calls, wanted)
+                self.assertEqual((result.done, result.failed), (len(wanted), 0))
+                self.assertEqual(result.skipped, 3 if not wanted else int(force and opened))
+                for vid in "ABC":
+                    old, entry = before.get(vid), after.get(vid)
+                    if vid in wanted:
+                        self.assertEqual(entry.category, "acsm")
+                        self.assertEqual(entry.file_path, old.file_path)
+                        self.assertNotEqual(entry.downloaded_at, old.downloaded_at)
+                        self.assertEqual(entry.acsm_opened_at, "")
+                        self.assertEqual(entry.note, "")
+                    else:
+                        self.assertEqual(entry, old)
+                    payload = b"new opaque credential" if vid in wanted else b"old opaque credential"
+                    self.assertEqual((out / entry.file_path).read_bytes(), payload)
+                self.assertEqual(list(out.glob("*.part")), [])
+
+    def test_without_refresh_flags_skips_fresh_stale_and_opened_acsm_at_any_limit(self):
+        self._assert_refresh_matrix(False, False, {
+            (False, False): [], (False, True): [],
+            (True, False): [], (True, True): [],
+        })
+
+    def test_refresh_only_downloads_stale_acsm_even_if_opened_and_obeys_limit(self):
+        self._assert_refresh_matrix(True, False, {
+            (False, False): [], (False, True): [],
+            (True, False): list("ABC"), (True, True): list("ABC"),
+        })
+
+    def test_force_refresh_ignores_age_and_opened_acsm_does_not_consume_limit(self):
+        self._assert_refresh_matrix(False, True, {
+            (False, False): list("ABC"), (False, True): list("BC"),
+            (True, False): list("ABC"), (True, True): list("BC"),
+        })
+
+    def test_force_wins_when_both_refresh_flags_are_set_and_still_skips_opened_acsm(self):
+        self._assert_refresh_matrix(True, True, {
+            (False, False): list("ABC"), (False, True): list("BC"),
+            (True, False): list("ABC"), (True, True): list("BC"),
+        })
+
+    def test_refresh_skipped_fresh_acsm_does_not_consume_stale_download_limit(self):
+        before = self._seed(self.out, stale=True, opened=False)
+        before.get("A").downloaded_at = datetime.now(timezone.utc).isoformat()
+        before.save()
+        result, calls, after = self._export(self.out, refresh_acsm=True, limit=1)
+        self.assertEqual(calls, ["B"])
+        self.assertEqual((result.done, result.skipped, result.failed), (1, 1, 0))
+        self.assertEqual(after.get("A"), before.get("A"))
+        self.assertEqual(after.get("C"), before.get("C"))
+
+    def test_failed_refresh_consumes_limit_and_keeps_old_file_and_handoff_state(self):
+        for refresh, force in ((True, False), (False, True), (True, True)):
+            with self.subTest(refresh=refresh, force=force):
+                out = self.out / f"{refresh}-{force}"
+                before = self._seed(out, stale=True, opened=True)
+                result, calls, after = self._export(
+                    out, failure=True, refresh_acsm=refresh, force_refresh_acsm=force, limit=1,
+                )
+                self.assertEqual(calls, ["B"] if force else ["A"])
+                self.assertEqual((result.done, result.skipped, result.failed), (0, int(force), 1))
+                for vid in "ABC":
+                    old, entry = before.get(vid), after.get(vid)
+                    self.assertEqual(entry.category, old.category)
+                    self.assertEqual(entry.file_path, old.file_path)
+                    self.assertEqual(entry.downloaded_at, old.downloaded_at)
+                    self.assertEqual(entry.acsm_opened_at, old.acsm_opened_at)
+                    if vid in calls:
+                        self.assertTrue(entry.note.startswith("refresh failed: HTTPStatusError:"))
+                    else:
+                        self.assertEqual(entry, old)
+                    self.assertEqual((out / entry.file_path).read_bytes(), b"old opaque credential")
+                self.assertEqual(list(out.glob("*.part")), [])
 
 
 if __name__ == "__main__":
