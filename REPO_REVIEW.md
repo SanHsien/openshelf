@@ -96,7 +96,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [x] `scan` 新增書、更新 metadata、保留既有已下載檔案。（2026-10-25，`1038d95`）
 - [x] `export` EPUB 失敗後改試 PDF，成功後正確更新 manifest。（2026-10-25，`1038d95`）
 - [x] 下載或覆核失敗時不覆蓋舊檔，且保留可診斷的 `note`。（2026-10-25，`1038d95`）
-- [x] `refresh_acsm` / `force_refresh_acsm` / `limit` / 已送出 ACSM 的組合行為。（2026-10-29，提交由派工方處理，commit hash 待提交後補註；`tests/test_service_flow.py::AcsmRefreshFlow` 新增 6 個整合測試、51 組子案例，涵蓋雙旗標、時效、已送出狀態、無上限／1／2 本、跳過不占名額、失敗占名額及舊檔與送出紀錄保留；原「重抓失敗保留舊檔」測試 `1038d95` 保留）
+- [x] `refresh_acsm` / `force_refresh_acsm` / `limit` / 已送出 ACSM 的組合行為。（2026-10-29，5ea9712；`tests/test_service_flow.py::AcsmRefreshFlow` 新增 6 個整合測試、51 組子案例，涵蓋雙旗標、時效、已送出狀態、無上限／1／2 本、跳過不占名額、失敗占名額及舊檔與送出紀錄保留；原「重抓失敗保留舊檔」測試 `1038d95` 保留）
 - [ ] GUI 取消時停止在安全邊界，不留下半寫 manifest 或 `.part` 檔。（僅測 `should_stop` 在第一本前生效，`1038d95`；GUI 實際取消流程仍待補）
 - [ ] 401 / 403 中止整批並顯示重新登入提示。（僅測 401 中止整批，`1038d95`；403 與 CLI 提示訊息仍待補）
 
