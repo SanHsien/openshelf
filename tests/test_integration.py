@@ -5,9 +5,16 @@
 """
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import httpx
+from click.testing import CliRunner
+
+from openshelf import cli
+from openshelf.session import check_storage_permissions
 
 from openshelf.classify import classify
 from openshelf.playbooks import (
@@ -172,6 +179,102 @@ class EndpointDoctor(unittest.TestCase):
         with self._client(lambda r: httpx.Response(500, json=[])) as client:
             ok, msg = check_library_endpoint(client)
         self.assertFalse(ok)
+
+
+
+
+class StoragePermissionsTest(unittest.TestCase):
+    def test_missing_file_returns_none(self):
+        missing = Path("non_existent_storage_state.json")
+        self.assertIsNone(check_storage_permissions(missing))
+
+    def test_windows_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "storage_state.json"
+            p.write_text("{}", encoding="utf-8")
+            with mock.patch("sys.platform", "win32"):
+                self.assertIsNone(check_storage_permissions(p))
+
+    def test_posix_safe_permissions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "storage_state.json"
+            p.write_text("{}", encoding="utf-8")
+            with mock.patch("sys.platform", "linux"):
+                fake_stat = mock.MagicMock()
+                for safe_mode in (0o100600, 0o100400):
+                    fake_stat.st_mode = safe_mode
+                    with mock.patch.object(Path, "stat", return_value=fake_stat):
+                        self.assertIsNone(check_storage_permissions(p))
+
+    def test_posix_permissive_permissions_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "storage_state.json"
+            p.write_text("{}", encoding="utf-8")
+            with mock.patch("sys.platform", "linux"):
+                fake_stat = mock.MagicMock()
+                for perm_mode in (0o100644, 0o100664, 0o100666, 0o100777):
+                    fake_stat.st_mode = perm_mode
+                    with mock.patch.object(Path, "stat", return_value=fake_stat):
+                        warn = check_storage_permissions(p)
+                        self.assertIsNotNone(warn)
+                        self.assertIn("權限過寬", warn)
+                        self.assertIn("chmod 600", warn)
+                        self.assertIn(str(p), warn)
+
+    def test_doctor_cli_warns_on_permissive_storage_state(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = Path(tmp) / "storage_state.json"
+            storage.write_text("{}", encoding="utf-8")
+            cfg_path = Path(tmp) / "config.toml"
+            cfg_path.write_text(f'storage_state = "{storage.as_posix()}"\n', encoding="utf-8")
+
+            fake_stat = mock.MagicMock()
+            fake_stat.st_mode = 0o100644
+            with mock.patch("sys.platform", "linux"), \
+                 mock.patch.object(Path, "stat", return_value=fake_stat), \
+                 mock.patch("openshelf.cli.build_client"), \
+                 mock.patch("openshelf.playbooks.check_library_endpoint", return_value=(True, "端點正常")):
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "doctor"])
+                self.assertEqual(res.exit_code, 0)
+                self.assertIn("警告：", res.output)
+                self.assertIn("權限過寬", res.output)
+                self.assertIn("OK 端點正常", res.output)
+
+    def test_doctor_cli_no_warning_on_safe_storage_state(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = Path(tmp) / "storage_state.json"
+            storage.write_text("{}", encoding="utf-8")
+            cfg_path = Path(tmp) / "config.toml"
+            cfg_path.write_text(f'storage_state = "{storage.as_posix()}"\n', encoding="utf-8")
+
+            fake_stat = mock.MagicMock()
+            fake_stat.st_mode = 0o100600
+            with mock.patch("sys.platform", "linux"), \
+                 mock.patch.object(Path, "stat", return_value=fake_stat), \
+                 mock.patch("openshelf.cli.build_client"), \
+                 mock.patch("openshelf.playbooks.check_library_endpoint", return_value=(True, "端點正常")):
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "doctor"])
+                self.assertEqual(res.exit_code, 0)
+                self.assertNotIn("警告：", res.output)
+                self.assertIn("OK 端點正常", res.output)
+
+    def test_doctor_cli_no_warning_on_windows(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = Path(tmp) / "storage_state.json"
+            storage.write_text("{}", encoding="utf-8")
+            cfg_path = Path(tmp) / "config.toml"
+            cfg_path.write_text(f'storage_state = "{storage.as_posix()}"\n', encoding="utf-8")
+
+            with mock.patch("sys.platform", "win32"), \
+                 mock.patch("openshelf.cli.build_client"), \
+                 mock.patch("openshelf.playbooks.check_library_endpoint", return_value=(True, "端點正常")):
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "doctor"])
+                self.assertEqual(res.exit_code, 0)
+                self.assertNotIn("警告：", res.output)
+                self.assertIn("OK 端點正常", res.output)
 
 
 if __name__ == "__main__":

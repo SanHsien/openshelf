@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import httpx
@@ -34,6 +35,29 @@ def _load_cookies(storage_state: Path) -> list[dict]:
         )
     data = json.loads(storage_state.read_text(encoding="utf-8"))
     return data.get("cookies", [])
+
+
+def check_storage_permissions(storage_state: Path) -> str | None:
+    """檢查登入態檔案權限（POSIX 系統）。
+
+    若在 POSIX 系統（非 Windows）上且群組或其他使用者具有存取權限（mode & 0o077 != 0），
+    回傳警告文字；若權限正常、非 POSIX 系統（Windows ACL 另列中期）或檔案不存在則回傳 None。
+    """
+    if sys.platform.startswith("win"):
+        return None
+    if not storage_state.is_file():
+        return None
+    try:
+        mode = storage_state.stat().st_mode
+    except OSError:
+        return None
+    if mode & 0o077:
+        current_octal = oct(mode & 0o777)
+        return (
+            f"登入態檔案 {storage_state} 權限過寬（{current_octal}），"
+            f"其他本機使用者可能可讀取敏感 cookie；建議設為 600（chmod 600 {storage_state}）。"
+        )
+    return None
 
 
 def build_client(config: Config) -> httpx.Client:

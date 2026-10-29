@@ -14,7 +14,7 @@ from . import acsm, calibre, playbooks, reader, service
 from .config import load_config
 from .manifest import Manifest
 from .playbooks import EndpointNotConfigured, IncompleteLibrary
-from .session import NotLoggedIn, SessionExpired, build_client
+from .session import NotLoggedIn, SessionExpired, build_client, check_storage_permissions
 
 console = Console()
 
@@ -293,6 +293,9 @@ def acsm_report(ctx: click.Context) -> None:
 @click.pass_context
 def doctor(ctx: click.Context) -> None:
     cfg = ctx.obj["config"]
+    perm_warning = check_storage_permissions(cfg.storage_state)
+    if perm_warning:
+        console.print(f"[yellow]警告：[/yellow]{perm_warning}")
     try:
         client = build_client(cfg)
     except (NotLoggedIn, SessionExpired) as e:
