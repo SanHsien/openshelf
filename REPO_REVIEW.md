@@ -132,7 +132,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 影響：這不是遠端漏洞，但在共用電腦、寬鬆 umask、備份同步或其他本機帳號可讀的環境中，登入態可能被非預期存取。
 
-修復紀錄（2026-10-25，`1038d95`；2026-10-30）：存檔後 best-effort `chmod 600` 已完成；`doctor` POSIX 權限過寬檢查已完成；Windows ACL 仍列中期。
+修復紀錄（2026-10-25，`1038d95`；2026-10-30 `ad94f47`）：存檔後 best-effort `chmod 600` 已完成；`doctor` POSIX 權限過寬檢查已完成；Windows ACL 仍列中期。
 
 建議：
 
@@ -222,7 +222,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 ### 下一個維護週期
 
 - [x] 定義 manifest 對已移除書籍的同步政策。（2026-10-25，`707c87d`；維護者決定：標記「已下架」、保留資料與檔案）
-- [x] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` POSIX 權限過寬警告與測試已於 2026-10-30 完成；Windows ACL 另列中期）
+- [x] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` POSIX 權限過寬警告與測試已於 2026-10-30 `ad94f47` 完成；Windows ACL 另列中期）
 - [ ] ~~把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。~~（2026-10-25 維護者決定維持現狀，不調整資料夾位置）
 - [x] 防護 CSV 公式注入。（2026-10-25，`1038d95`）
 - [ ] 在既有依賴 freshness tracker 之上，導入 Release constraints / SBOM 與打包產物 smoke test。
