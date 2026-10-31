@@ -14,7 +14,6 @@
 | --- | --- | --- | --- | --- |
 | 處理 issue #1 的 `ruff` 列（三擇一：確有需要才升下限並在 commit 寫理由／`# freshness-hold:`／`.github/dependency-deferrals.json`），讓 tracker 自行關閉（不要手動關） | issue #1 的「需要維護」列；`AGENTS.md:64-75` 只給兩條正當出口，且明禁以調高下限讓紅燈消失 | commit 訊息寫出選哪條與理由，不得只為消紅燈升下限；`ruff check .` 與 `pytest` 綠；`依賴新鮮度檢查` workflow 重跑後 issue #1 state=closed（查：`gh issue view 1 --repo SanHsien/openshelf --json state`） | Codex | issue #1；`pyproject.toml:21`；`AGENTS.md:64-75` |
 | 補 403 與 CLI 重新登入提示的測試，並決定 403 是否一律視為登入態失效 | 目前 403 一律中止整批，但可能只是單本無權限；只有 401 有測試 | 先有 403 行為的失敗測試，再依決定修或明文鎖定現行行為；`pytest` 綠；`REPO_REVIEW.md:101` 回註。決定需要真實書庫資料時停在「維護者」 | Claude Opus | `REPO_REVIEW.md:101`；`openshelf/playbooks.py:150`、`openshelf/session.py:26`；取捨紀錄在 2026-10-26 深掃報告「刻意不修」第一項 |
-| Release workflow 前置檢查：先跑測試、tag／`pyproject.toml`／`openshelf.__version__` 一致、tag 指向 `main` 上的 commit | 現行 release 每次裝當下最新依賴且不跑測試，任意 `v*` tag 可發佈未審查二進位 | `release.yml` 有對應 preflight job，用一個故意不一致的 tag 在 fork 或 dry run 驗證會失敗；`REPO_REVIEW.md:170-171` 回註 | Claude Opus | `REPO_REVIEW.md:165-173`；`.github/workflows/release.yml`（含 90 行附近斷史 tag 說明） |
 
 ## 中期：等條件成立再做
 | 項目 | 觸發條件 | 驗收方式 | 建議執行者 | 證據 |

@@ -8,7 +8,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:  # 也允許手動觸發（不一定發佈）
+  workflow_dispatch:  # 也允許手動觸發（不一定發佈）；preflight 現在對非 main 上的 commit 一律擋下，手動觸發也一樣
 
 permissions:
   contents: write
@@ -19,7 +19,37 @@ env:
   PYTHONIOENCODING: "utf-8"
 
 jobs:
+  preflight:
+    name: Preflight checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[maintenance,lint]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Verify release preflight
+        run: python tools/check_release_preflight.py
+
   build-windows:
+    needs: preflight
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

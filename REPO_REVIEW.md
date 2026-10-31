@@ -167,8 +167,8 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 建議：
 
 - [ ] 為 Release 使用經 CI 驗證的 constraints / lock，定期由 Dependabot 或排程更新。
-- [ ] Release job 先跑完整測試，並驗證 tag、package metadata、UI 版本三者一致。
-- [ ] 確認發布 tag 指向允許的 `main` commit，避免任意 `v*` tag 直接發布未審查二進位。
+- [x] Release job 先跑完整測試，並驗證 tag、package metadata、UI 版本三者一致。
+- [x] 確認發布 tag 指向允許的 `main` commit，避免任意 `v*` tag 直接發布未審查二進位。
 - [ ] 保存建置時的相依版本清單或 SBOM。
 - [ ] 打包後至少做離線啟動 smoke：import 主要模組、載入設定、建立 GUI 後立即關閉；不接觸真實登入態或 Google 端點。
 
@@ -179,6 +179,10 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 本輪人工審查（2026-08-08）：freshness tracker issue #1 指出 Playwright 最低版本落後，重跑檢查另發現 Packaging 已出 26.3，將兩者更新為 `playwright>=1.62.0` 與 `packaging>=26.3`。兩者皆為 minor／patch，`requires_python` 分別為 `>=3.10` 與 `>=3.9`，涵蓋本專案的 `>=3.11`；Playwright 1.62 的 classifiers 已含 Python 3.11–3.14，且 `openshelf/browser.py` 只用 `sync_playwright()` 與 `chromium.launch_persistent_context()` 這類穩定 API，不受 1.62 影響。128 項測試通過，重跑 `tools/check_dependency_freshness.py` 全部套件為 OK，沒有 open Dependabot PR，維護 issue 由 freshness workflow 自動關閉。Playwright 1.62.0 之下的 Google 登入流程已於 2026-08-09 由維護者實機驗證通過，補齊本節處理流程第 3 點要求的登入驗證。
 
 修復紀錄（2026-07-28，commit `e2a6a77`）：首次 live `pull_request_target` 驗證發現，GitHub CLI 對 PR 執行 `addLabelsToLabelable` 需要 `pull-requests: write`，原本只給 read 會讓分類 workflow 在貼標籤時失敗。已只在受 Dependabot author、`main`、OPEN state 與 trusted-base checkout 限制的 review workflow 恢復該必要權限；PR #15 rebase 後的 run `30376429732` 成功，head-bound `Dependabot policy` 為 neutral、套用 `dependencies-manual-review`，未進入 auto-merge queue。
+
+修復紀錄（2026-10-31）：
+- Release workflow 前置檢查：`.github/workflows/release.yml` 新增 `preflight` job，執行環境設為 `ubuntu-latest`（`permissions: contents: read`），在建置產物前先執行 `pip install -e ".[maintenance,lint]"`、`ruff check .` 與完整單元測試；`build-windows` 設為 `needs: preflight`。
+- 版本與發布分支驗證：新增 `tools/check_release_preflight.py`，檢查 release tag（`v*`）、`pyproject.toml` 中的 `project.version` 與 `openshelf.__version__` 三者一致，並以 `git merge-base --is-ancestor` 驗證 tag 指向 `origin/main`（或 `main`）上的 commit，防範任意 tag 觸發未審查二進位發布；由 `tests/test_release_preflight.py` 涵蓋版本一致性、故意不一致 tag 報錯、非 main 分支 commit 攔截及 release.yml preflight 契約。
 
 修復紀錄（2026-10-25，commit `1038d95`）：
 - 檔名碰撞：`service._filename_key` 以正規化後檔名（casefold）分組，撞名時沿用年份／出版社／volume_id 辨識；測試 `tests/test_service_flow.py::test_colliding_normalized_names_do_not_overwrite`。
