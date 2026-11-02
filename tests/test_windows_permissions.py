@@ -102,5 +102,8 @@ class WindowsStoragePermissionsTest(unittest.TestCase):
             ):
                 result = CliRunner().invoke(cli.main, ["--config", str(config), "doctor"])
             self.assertEqual(result.exit_code, 0, result.output)
-            self.assertIn("ACL 可能過寬", result.output)
-            self.assertIn("OK 端點正常", result.output)
+            # click wraps the warning at the terminal width, and a long temp path can push a line
+            # break between words (seen on the Linux runner); compare with whitespace collapsed.
+            output = " ".join(result.output.split())
+            self.assertIn("ACL 可能過寬", output)
+            self.assertIn("OK 端點正常", output)
