@@ -110,7 +110,7 @@ Google Play Books 沒有公開的「下載已購書」API。OpenShelf 將目前�
 | `openshelf export` | 下載可匯出的 EPUB/PDF 或 `.acsm` |
 | `openshelf status` | 查看目前統計與狀態 |
 | `openshelf report` | 產生 TXT / CSV / HTML 報表 |
-| `openshelf doctor` | 檢查 Google 後端端點是否仍符合預期 |
+| `openshelf doctor` | 檢查登入態檔案的 POSIX 權限／Windows ACL，以及 Google 後端端點 |
 | `openshelf acsm-open` | 將已下載的 `.acsm` 交給系統預設程式 / ADE |
 | `openshelf ebook-open` | 開啟已下載的無 DRM EPUB/PDF |
 | `openshelf calibre-import` | 將無 DRM EPUB/PDF 匯入 Calibre |

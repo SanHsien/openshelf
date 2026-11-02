@@ -21,7 +21,6 @@
 | 實機驗證 total／可解析數一致，再決定是否放寬「取不齊就 fail closed」 | 維護者在登入狀態下自行跑 `openshelf scan`（2026-10-28 一次實機結果為 exit 0、無 IncompleteLibrary，報表在維護者本機）；若日後 scan 回報 IncompleteLibrary 才需處理 | 以 `openshelf doctor` 與 `scan` 輸出比對 Google 宣告總數與可解析數，記錄在 `REPO_REVIEW.md`；不一致時另開失敗測試再修 | 維護者 | `REPO_REVIEW.md` 已下架段落；接續開發報告（2026-10-25） |
 | Release constraints／lock、SBOM、打包產物離線啟動 smoke | 上列 release preflight 已落地且穩定一個發版週期 | release workflow 產出依賴清單附件；smoke step 在三平台 import 並建立 GUI 後關閉、不連網；以一次 dry run 全綠為證 | Claude Opus | `REPO_REVIEW.md:169,172,173,228` |
 | 補 GUI 取消流程測試 | 有人決定引入可無頭執行 PySide6 的測試手段（如 offscreen platform）且 CI 能穩定跑 | 取消後 manifest 完整、無 `.part` 殘留的測試綠；`REPO_REVIEW.md:100` 回註 | Claude Sonnet | `REPO_REVIEW.md:100` |
-| Windows ACL 檢查納入 `doctor` | 有 Windows 使用者回報登入態檔案被其他帳號讀取，或 POSIX 版 doctor 檢查已落地 | Windows 上 doctor 能判斷 ACL 並有測試或實機紀錄 | Claude Sonnet | `REPO_REVIEW.md:135` |
 | GUI 表格顯示「已下架」標記 | 維護者決定要加（CLI、報表、CSV、HTML 已有） | GUI 表格出現狀態欄，截圖或離線 GUI smoke 驗證 | 維護者 | 深掃報告（2026-10-26）「刻意不修」段 |
 
 ## 刻意不做

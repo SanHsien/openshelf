@@ -110,7 +110,7 @@ Google Play Books does not provide a public "download my purchased books" API. O
 | `openshelf export` | Download available EPUB/PDF or `.acsm` files |
 | `openshelf status` | Show current counts and state |
 | `openshelf report` | Produce TXT / CSV / HTML reports |
-| `openshelf doctor` | Check whether the Google endpoint still matches expectations |
+| `openshelf doctor` | Check session-file POSIX permissions / Windows ACLs and the Google endpoint |
 | `openshelf acsm-open` | Hand downloaded `.acsm` files to the default app / ADE |
 | `openshelf ebook-open` | Open downloaded DRM-free EPUB/PDF files |
 | `openshelf calibre-import` | Import DRM-free EPUB/PDF files into Calibre |

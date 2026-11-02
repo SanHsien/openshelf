@@ -188,12 +188,15 @@ class StoragePermissionsTest(unittest.TestCase):
         missing = Path("non_existent_storage_state.json")
         self.assertIsNone(check_storage_permissions(missing))
 
-    def test_windows_skipped(self):
+    def test_windows_acl_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "storage_state.json"
             p.write_text("{}", encoding="utf-8")
-            with mock.patch("sys.platform", "win32"):
-                self.assertIsNone(check_storage_permissions(p))
+            with mock.patch("sys.platform", "win32"), mock.patch(
+                "openshelf.session._check_windows_storage_permissions", return_value="ACL warning",
+            ) as check_acl:
+                self.assertEqual(check_storage_permissions(p), "ACL warning")
+                check_acl.assert_called_once_with(p)
 
     def test_posix_safe_permissions(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -260,7 +263,7 @@ class StoragePermissionsTest(unittest.TestCase):
                 self.assertNotIn("警告：", res.output)
                 self.assertIn("OK 端點正常", res.output)
 
-    def test_doctor_cli_no_warning_on_windows(self):
+    def test_doctor_cli_no_warning_on_private_windows_acl(self):
         runner = CliRunner()
         with tempfile.TemporaryDirectory() as tmp:
             storage = Path(tmp) / "storage_state.json"
@@ -269,6 +272,7 @@ class StoragePermissionsTest(unittest.TestCase):
             cfg_path.write_text(f'storage_state = "{storage.as_posix()}"\n', encoding="utf-8")
 
             with mock.patch("sys.platform", "win32"), \
+                 mock.patch("openshelf.session._check_windows_storage_permissions", return_value=None), \
                  mock.patch("openshelf.cli.build_client"), \
                  mock.patch("openshelf.playbooks.check_library_endpoint", return_value=(True, "端點正常")):
                 res = runner.invoke(cli.main, ["--config", str(cfg_path), "doctor"])
