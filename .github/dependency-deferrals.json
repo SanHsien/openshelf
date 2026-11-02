@@ -3,6 +3,10 @@
     "playwright": {
       "deferredLatest": "1.64.1",
       "reason": "Playwright only runs the one-time login; 1.64.0 covers it and 1.64.1 is a patch release nothing here needs. Raising the floor alone was declined in PR #24 (2026-09-28); reviewed again 2026-10-25."
+    },
+    "ruff": {
+      "deferredLatest": "0.17.3",
+      "reason": "Lint-only dev tool (E4/E7/E9/F); 0.17.2 passes ruff check on main and 0.17.3 is a patch release with nothing this repo needs. Not raising the floor just to silence the tracker (AGENTS.md, dependency freshness section). Reviewed 2026-11-02."
     }
   }
 }
