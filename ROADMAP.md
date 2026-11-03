@@ -5,23 +5,22 @@
 
 ## 現況
 
-公開版核心：只下載無 DRM 的 EPUB/PDF，DRM 書只原樣存檔官方 `.acsm`（邊界見 `AGENTS.md`「專案宗旨與邊界」）。2026-10-29 快照：open PR 0；Dependabot 與 code scanning 告警皆 0；CI、CodeQL、依賴新鮮度、Dependabot guarded merge 在 `main` 最近一次皆 success；最近 release v1.0.4（2026-08-08）。唯一 open issue 是 #1「依賴新鮮度檢查：需要維護」，快照中只有 `ruff` 一列為「需要維護」（pyproject.toml:21 下限 `ruff>=0.17.2`，PyPI 最新較高），`playwright` 為已記錄理由的 DEFERRED。
+公開版核心：只下載無 DRM 的 EPUB/PDF，DRM 書只原樣存檔官方 `.acsm`（邊界見 `AGENTS.md`「專案宗旨與邊界」）。2026-11-02 快照：open PR 1（Dependabot #34 待維護者依 deferral 關閉）；Dependabot 與 code scanning 告警皆 0；CI、CodeQL、依賴新鮮度、Dependabot guarded merge 在 `main` 最近一次皆 success；最近 release v1.0.4（2026-08-08）。open issue #1「依賴新鮮度檢查：需要維護」，直接依賴中 `playwright` 已 DEFERRED；`ruff` 0.17.3 已加 deferral，待 `main` 上的 workflow 刷新與 #34 關閉後，issue #1 由 tracker 自動關閉。
 
 **與 `openshelf-personal` 的分工**：本 repo 擁有「共用核心」的所有後續工作（掃描、匯出、manifest、設定、doctor、release 流程設計與測試補強）。私人 GPL 版的路線圖只認領 DeDRM／fulfill 相關項目，以及「待本 repo 先做完後移植」的對應列；本 repo 不認領任何解密、ACSM 解析或金鑰相關工作。
 
 ## 近期：可以直接動手
 | 項目 | 為什麼 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
-| 處理 issue #1 的 `ruff` 列（三擇一：確有需要才升下限並在 commit 寫理由／`# freshness-hold:`／`.github/dependency-deferrals.json`），讓 tracker 自行關閉（不要手動關） | issue #1 的「需要維護」列；`AGENTS.md:64-75` 只給兩條正當出口，且明禁以調高下限讓紅燈消失 | commit 訊息寫出選哪條與理由，不得只為消紅燈升下限；`ruff check .` 與 `pytest` 綠；`依賴新鮮度檢查` workflow 重跑後 issue #1 state=closed（查：`gh issue view 1 --repo SanHsien/openshelf --json state`） | Codex | issue #1；`pyproject.toml:21`；`AGENTS.md:64-75` |
-| 補 403 與 CLI 重新登入提示的測試，並決定 403 是否一律視為登入態失效 | 目前 403 一律中止整批，但可能只是單本無權限；只有 401 有測試 | 先有 403 行為的失敗測試，再依決定修或明文鎖定現行行為；`pytest` 綠；`REPO_REVIEW.md:101` 回註。決定需要真實書庫資料時停在「維護者」 | Claude Opus | `REPO_REVIEW.md:101`；`openshelf/playbooks.py:150`、`openshelf/session.py:26`；取捨紀錄在 2026-10-26 深掃報告「刻意不修」第一項 |
+| 關閉 Dependabot #34 並確認 issue #1 自動關閉 | ruff 0.17.3 已依 `.github/dependency-deferrals.json` 延後；tracker 只在無 open Dependabot PR 時自動關 | deferral 已在 `main` 上之後，在 #34 留言引用 deferral 再關閉；之後 `gh issue view 1 --repo SanHsien/openshelf --json state` 為 CLOSED（不手動關 issue） | 維護者 | issue #1；PR #34；`.github/workflows/dependency-freshness.yml:175-199` |
 
 ## 中期：等條件成立再做
 | 項目 | 觸發條件 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
+| 評估是否區分單本 403 與登入過期 | 維護者取得真實書庫中單本 403 的樣本 | 決定是否區分單本無權限與登入過期；要區分時先寫失敗測試 | 維護者 | `REPO_REVIEW.md:101`；`openshelf/playbooks.py:150` |
 | 實機驗證 total／可解析數一致，再決定是否放寬「取不齊就 fail closed」 | 維護者在登入狀態下自行跑 `openshelf scan`（2026-10-28 一次實機結果為 exit 0、無 IncompleteLibrary，報表在維護者本機）；若日後 scan 回報 IncompleteLibrary 才需處理 | 以 `openshelf doctor` 與 `scan` 輸出比對 Google 宣告總數與可解析數，記錄在 `REPO_REVIEW.md`；不一致時另開失敗測試再修 | 維護者 | `REPO_REVIEW.md` 已下架段落；接續開發報告（2026-10-25） |
 | Release constraints／lock、SBOM、打包產物離線啟動 smoke | 上列 release preflight 已落地且穩定一個發版週期 | release workflow 產出依賴清單附件；smoke step 在三平台 import 並建立 GUI 後關閉、不連網；以一次 dry run 全綠為證 | Claude Opus | `REPO_REVIEW.md:169,172,173,228` |
 | 補 GUI 取消流程測試 | 有人決定引入可無頭執行 PySide6 的測試手段（如 offscreen platform）且 CI 能穩定跑 | 取消後 manifest 完整、無 `.part` 殘留的測試綠；`REPO_REVIEW.md:100` 回註 | Claude Sonnet | `REPO_REVIEW.md:100` |
-| Windows ACL 檢查納入 `doctor` | 有 Windows 使用者回報登入態檔案被其他帳號讀取，或 POSIX 版 doctor 檢查已落地 | Windows 上 doctor 能判斷 ACL 並有測試或實機紀錄 | Claude Sonnet | `REPO_REVIEW.md:135` |
 | GUI 表格顯示「已下架」標記 | 維護者決定要加（CLI、報表、CSV、HTML 已有） | GUI 表格出現狀態欄，截圖或離線 GUI smoke 驗證 | 維護者 | 深掃報告（2026-10-26）「刻意不修」段 |
 
 ## 刻意不做

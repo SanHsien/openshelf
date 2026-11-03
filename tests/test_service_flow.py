@@ -87,6 +87,12 @@ class ScanFlow(_Env):
             service.scan(self.cfg, log=lambda s: None)
         self.assertFalse((self.out / "manifest.json").exists())
 
+    def test_session_expired_on_403_does_not_write_manifest(self):
+        self._patch_client(lambda req: httpx.Response(403))
+        with self.assertRaises(SessionExpired):
+            service.scan(self.cfg, log=lambda s: None)
+        self.assertFalse((self.out / "manifest.json").exists())
+
 
 class InactiveSync(_Env):
     def _seed(self, ids):
@@ -264,6 +270,20 @@ class ExportFlow(_Env):
         def handler(req):
             calls.append(str(req.url))
             return httpx.Response(401)
+
+        self._patch_client(handler)
+        with self.assertRaises(SessionExpired):
+            service.export(self.cfg, "epub", True, option_cache=cache, log=lambda s: None)
+        self.assertEqual(len(calls), 1)
+
+    def test_session_expired_on_403_aborts_whole_batch(self):
+        self._manifest([("A", "書A"), ("B", "書B")])
+        cache = {v: [ExportOption(fmt="epub", url=f"https://x/{v}")] for v in "AB"}
+        calls = []
+
+        def handler(req):
+            calls.append(str(req.url))
+            return httpx.Response(403)
 
         self._patch_client(handler)
         with self.assertRaises(SessionExpired):

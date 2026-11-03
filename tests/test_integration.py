@@ -188,12 +188,15 @@ class StoragePermissionsTest(unittest.TestCase):
         missing = Path("non_existent_storage_state.json")
         self.assertIsNone(check_storage_permissions(missing))
 
-    def test_windows_skipped(self):
+    def test_windows_acl_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "storage_state.json"
             p.write_text("{}", encoding="utf-8")
-            with mock.patch("sys.platform", "win32"):
-                self.assertIsNone(check_storage_permissions(p))
+            with mock.patch("sys.platform", "win32"), mock.patch(
+                "openshelf.session._check_windows_storage_permissions", return_value="ACL warning",
+            ) as check_acl:
+                self.assertEqual(check_storage_permissions(p), "ACL warning")
+                check_acl.assert_called_once_with(p)
 
     def test_posix_safe_permissions(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -260,7 +263,7 @@ class StoragePermissionsTest(unittest.TestCase):
                 self.assertNotIn("警告：", res.output)
                 self.assertIn("OK 端點正常", res.output)
 
-    def test_doctor_cli_no_warning_on_windows(self):
+    def test_doctor_cli_no_warning_on_private_windows_acl(self):
         runner = CliRunner()
         with tempfile.TemporaryDirectory() as tmp:
             storage = Path(tmp) / "storage_state.json"
@@ -269,12 +272,95 @@ class StoragePermissionsTest(unittest.TestCase):
             cfg_path.write_text(f'storage_state = "{storage.as_posix()}"\n', encoding="utf-8")
 
             with mock.patch("sys.platform", "win32"), \
+                 mock.patch("openshelf.session._check_windows_storage_permissions", return_value=None), \
                  mock.patch("openshelf.cli.build_client"), \
                  mock.patch("openshelf.playbooks.check_library_endpoint", return_value=(True, "端點正常")):
                 res = runner.invoke(cli.main, ["--config", str(cfg_path), "doctor"])
                 self.assertEqual(res.exit_code, 0)
                 self.assertNotIn("警告：", res.output)
                 self.assertIn("OK 端點正常", res.output)
+
+
+class CliSessionExpiredTest(unittest.TestCase):
+    def tearDown(self):
+        import logging
+        logger = logging.getLogger("openshelf")
+        for h in list(logger.handlers):
+            logger.removeHandler(h)
+            h.close()
+        logger._openshelf_path = None
+
+    def _create_env(self, tmp: str, *, with_manifest_books: bool = False) -> tuple[Path, Path]:
+        storage = Path(tmp) / "storage_state.json"
+        storage.write_text('{"cookies":[{"name":"SAPISID","value":"X","domain":"google.com"}]}', encoding="utf-8")
+        out = Path(tmp) / "out"
+        out.mkdir()
+        manifest_path = out / "manifest.json"
+        if with_manifest_books:
+            manifest_path.write_text(
+                json.dumps({"books": {"A": {"volume_id": "A", "title": "書A", "category": "drm_free"}}}),
+                encoding="utf-8",
+            )
+        cfg_path = Path(tmp) / "config.toml"
+        cfg_path.write_text(
+            f'storage_state = "{storage.as_posix()}"\n'
+            f'output_dir = "{out.as_posix()}"\n'
+            f'manifest_path = "{manifest_path.as_posix()}"\n',
+            encoding="utf-8",
+        )
+        return cfg_path, storage
+
+    def test_scan_cli_session_expired_prompts_relogin_on_401(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            cfg_path, _ = self._create_env(tmp)
+            with mock.patch("openshelf.service.build_client") as mock_build:
+                mock_client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(401)))
+                mock_client.cookies.set("SAPISID", "X", domain="google.com")
+                mock_build.return_value = mock_client
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "scan"])
+                self.assertNotEqual(res.exit_code, 0)
+                self.assertIn("登入態被拒絕（HTTP 401）", res.output)
+                self.assertIn("請重新 openshelf login", res.output)
+
+    def test_scan_cli_session_expired_prompts_relogin_on_403(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            cfg_path, _ = self._create_env(tmp)
+            with mock.patch("openshelf.service.build_client") as mock_build:
+                mock_client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(403)))
+                mock_client.cookies.set("SAPISID", "X", domain="google.com")
+                mock_build.return_value = mock_client
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "scan"])
+                self.assertNotEqual(res.exit_code, 0)
+                self.assertIn("登入態被拒絕（HTTP 403）", res.output)
+                self.assertIn("請重新 openshelf login", res.output)
+
+    def test_export_cli_session_expired_prompts_relogin_on_401(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            cfg_path, _ = self._create_env(tmp, with_manifest_books=True)
+            with mock.patch("openshelf.service.build_client") as mock_build:
+                mock_client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(401)))
+                mock_client.cookies.set("SAPISID", "X", domain="google.com")
+                mock_build.return_value = mock_client
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "export"])
+                self.assertNotEqual(res.exit_code, 0)
+                self.assertIn("登入態被拒絕（HTTP 401）", res.output)
+                self.assertIn("請重新 openshelf login", res.output)
+
+    def test_export_cli_session_expired_prompts_relogin_on_403(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            cfg_path, _ = self._create_env(tmp, with_manifest_books=True)
+            with mock.patch("openshelf.service.build_client") as mock_build:
+                mock_client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(403)))
+                mock_client.cookies.set("SAPISID", "X", domain="google.com")
+                mock_build.return_value = mock_client
+                res = runner.invoke(cli.main, ["--config", str(cfg_path), "export"])
+                self.assertNotEqual(res.exit_code, 0)
+                self.assertIn("登入態被拒絕（HTTP 403）", res.output)
+                self.assertIn("請重新 openshelf login", res.output)
 
 
 if __name__ == "__main__":

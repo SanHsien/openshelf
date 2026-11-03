@@ -98,7 +98,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [x] 下載或覆核失敗時不覆蓋舊檔，且保留可診斷的 `note`。（2026-10-25，`1038d95`）
 - [x] `refresh_acsm` / `force_refresh_acsm` / `limit` / 已送出 ACSM 的組合行為。（2026-10-29，5ea9712；`tests/test_service_flow.py::AcsmRefreshFlow` 新增 6 個整合測試、51 組子案例，涵蓋雙旗標、時效、已送出狀態、無上限／1／2 本、跳過不占名額、失敗占名額及舊檔與送出紀錄保留；原「重抓失敗保留舊檔」測試 `1038d95` 保留）
 - [ ] GUI 取消時停止在安全邊界，不留下半寫 manifest 或 `.part` 檔。（僅測 `should_stop` 在第一本前生效，`1038d95`；GUI 實際取消流程仍待補）
-- [ ] 401 / 403 中止整批並顯示重新登入提示。（僅測 401 中止整批，`1038d95`；403 與 CLI 提示訊息仍待補）
+- [x] 401 / 403 中止整批並顯示重新登入提示。（401 中止已測，`1038d95`；2026-11-02 `7111dd2` 補齊 403 中止整批、scan/export 在 401/403 時 CLI 顯示「請重新 openshelf login」提示與非零退出碼測試；明文鎖定 403 視為 SessionExpired 之現行行為，理由：維持 fail-closed 避免過期態將整庫誤標 failed，後續評估見 ROADMAP 中期）
 
 ### P2：`scan` 只合併，不處理已不在當次書庫中的舊項目
 
@@ -132,7 +132,7 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 
 影響：這不是遠端漏洞，但在共用電腦、寬鬆 umask、備份同步或其他本機帳號可讀的環境中，登入態可能被非預期存取。
 
-修復紀錄（2026-10-25，`1038d95`；2026-10-30 `ad94f47`）：存檔後 best-effort `chmod 600` 已完成；`doctor` POSIX 權限過寬檢查已完成；Windows ACL 仍列中期。
+修復紀錄（2026-10-25，`1038d95`；2026-10-30 `ad94f47`）：存檔後 best-effort `chmod 600` 已完成；`doctor` POSIX 權限過寬檢查已完成；Windows ACL 已完成（2026-11-03，`d80744d`；測試修正 `402e48f`）：以 SID 檢查目前使用者、SYSTEM、Administrators 以外的讀取 Allow（含繼承），null DACL 亦警告；查詢失敗或逾時明確提示無法確認，不讀取 cookie、不修改 ACL。採保守檢查，不計算群組與 Deny 的有效權限。Windows 實機測試驗證私人 ACL 與 Everyone 可讀 ACL；另有 doctor 輸出與異常路徑回歸測試。
 
 建議：
 
@@ -219,14 +219,14 @@ OpenShelf 的產品邊界清楚，程式碼也有確實遵守：ACSM 僅下載�
 - [x] 未知下載格式改成 fail closed。（2026-10-25，`1038d95`）
 - [x] 分頁未取齊時明確失敗，不提交部分 manifest。（2026-10-25，`1038d95`）
 - [x] 決定並實作「斷開歷史後首次發版」策略，避免依賴自動 compare notes。（2026-08-09，`dd4ffe4`；workflow preflight 仍待補）
-- [ ] 補 `scan` / `export` 主流程整合測試。（部分完成，`1038d95`：主路徑已測；P1 清單中 refresh 組合、GUI 取消、403 與提示訊息仍待補）
+- [ ] 補 `scan` / `export` 主流程整合測試。（部分完成，`1038d95`：主路徑已測；refresh 組合見 `5ea9712`；403 與 CLI 提示見 `7111dd2`；僅剩 GUI 取消流程仍待補）
 - [x] 清掉 Ruff 問題，將 lint 加入 CI。（2026-10-25，`1038d95`；規則限 E4/E7/E9/F；compileall／wheel build 仍待補）
 - [x] 更新 README 的測試敘述。（2026-08-09，`dd4ffe4`）
 
 ### 下一個維護週期
 
 - [x] 定義 manifest 對已移除書籍的同步政策。（2026-10-25，`707c87d`；維護者決定：標記「已下架」、保留資料與檔案）
-- [x] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` POSIX 權限過寬警告與測試已於 2026-10-30 `ad94f47` 完成；Windows ACL 另列中期）
+- [x] 強化 `storage_state.json` 權限與 `doctor` 提示。（存檔後 best-effort `chmod 600` 已於 2026-10-25 `1038d95` 完成；`doctor` POSIX 權限過寬警告與測試已於 2026-10-30 `ad94f47` 完成；Windows ACL 檢查已於 2026-11-03 `d80744d` 在 `doctor` 實作，測試修正 `402e48f`）
 - [ ] ~~把 macOS / Linux 使用者資料移出 executable / app bundle，做目標平台實機驗證。~~（2026-10-25 維護者決定維持現狀，不調整資料夾位置）
 - [x] 防護 CSV 公式注入。（2026-10-25，`1038d95`）
 - [ ] 在既有依賴 freshness tracker 之上，導入 Release constraints / SBOM 與打包產物 smoke test。
