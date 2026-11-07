@@ -1,18 +1,18 @@
 # 路線圖
 
 > 本 repo 後續工作的單一真相源。做完一項，就在同一個 commit 刪掉那一列；新工作只加在這裡。
-> 現況段的數字是 2026-10-29 依 `main` `45fa953e808a` 查的快照，開工前先重查 GitHub。
+> 現況段的數字是 2026-11-07 依 `main` `29f7c425df7d` 查的快照，開工前先重查 GitHub。
 
 ## 現況
 
-公開版核心：只下載無 DRM 的 EPUB/PDF，DRM 書只原樣存檔官方 `.acsm`（邊界見 `AGENTS.md`「專案宗旨與邊界」）。2026-11-02 快照：open PR 1（Dependabot #34 待維護者依 deferral 關閉）；Dependabot 與 code scanning 告警皆 0；CI、CodeQL、依賴新鮮度、Dependabot guarded merge 在 `main` 最近一次皆 success；最近 release v1.0.4（2026-08-08）。open issue #1「依賴新鮮度檢查：需要維護」，直接依賴中 `playwright` 已 DEFERRED；`ruff` 0.17.3 已加 deferral，待 `main` 上的 workflow 刷新與 #34 關閉後，issue #1 由 tracker 自動關閉。
+公開版核心：只下載無 DRM 的 EPUB/PDF，DRM 書只原樣存檔官方 `.acsm`（邊界見 `AGENTS.md`「專案宗旨與邊界」）。2026-11-07 查證快照：open PR 0（Dependabot #34 已於 2026-11-03 併入，下限為 `ruff>=0.17.3`）；open issue 0（#1 依賴新鮮度 tracker 已由 workflow 於 2026-11-03 自動關閉）；Dependabot 與 code scanning 告警皆 0；最近 release v1.0.4（2026-08-08）。依賴新鮮度：PyPI `ruff` 現行 0.17.4，已依 `.github/dependency-deferrals.json` 延後（`deferredLatest` 0.17.4；`uvx ruff@0.17.4 check .` 通過，release notes 無 E4/E7/E9/F 相關變更），`playwright` 同為 DEFERRED；PyPI 一超過延後版本，下次檢查會重新提醒。
 
 **與 `openshelf-personal` 的分工**：本 repo 擁有「共用核心」的所有後續工作（掃描、匯出、manifest、設定、doctor、release 流程設計與測試補強）。私人 GPL 版的路線圖只認領 DeDRM／fulfill 相關項目，以及「待本 repo 先做完後移植」的對應列；本 repo 不認領任何解密、ACSM 解析或金鑰相關工作。
 
 ## 近期：可以直接動手
 | 項目 | 為什麼 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
-| 關閉 Dependabot #34 並確認 issue #1 自動關閉 | ruff 0.17.3 已依 `.github/dependency-deferrals.json` 延後；tracker 只在無 open Dependabot PR 時自動關 | deferral 已在 `main` 上之後，在 #34 留言引用 deferral 再關閉；之後 `gh issue view 1 --repo SanHsien/openshelf --json state` 為 CLOSED（不手動關 issue） | 維護者 | issue #1；PR #34；`.github/workflows/dependency-freshness.yml:175-199` |
+| 無 | ruff 0.17.4 已依 deferral 延後；open PR／issue／告警皆 0（2026-11-07） | 開工重跑 `python tools/check_dependency_freshness.py --output <路徑>` 與 `gh pr list --repo SanHsien/openshelf`，無「需要維護」才維持「無」 | 維護者 | `.github/dependency-deferrals.json`；2026-11-07 `gh` 查詢 |
 
 ## 中期：等條件成立再做
 | 項目 | 觸發條件 | 驗收方式 | 建議執行者 | 證據 |
