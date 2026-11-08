@@ -18,7 +18,7 @@ dependencies = [
 gui = ["PySide6>=6.12.0"]
 build = ["pyinstaller>=6.22.3"]
 maintenance = ["packaging>=26.3"]
-lint = ["ruff>=0.17.3"]
+lint = ["ruff>=0.17.4"]
 
 [project.scripts]
 openshelf = "openshelf.cli:main"
