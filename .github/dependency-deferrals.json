@@ -1,8 +1,8 @@
 {
   "deferrals": {
     "playwright": {
-      "deferredLatest": "1.64.1",
-      "reason": "Playwright only runs the one-time login; 1.64.0 covers it and 1.64.1 is a patch release nothing here needs. Raising the floor alone was declined in PR #24 (2026-09-28); reviewed again 2026-10-25."
+      "deferredLatest": "1.65.2",
+      "reason": "Floor is 1.65.1. 1.65.2 is a patch release whose only highlight is a Chromium roll to r1255 (159.0.8154.6); OpenShelf uses Playwright only for the one-time local-browser login, which 1.65.1 covers, so no code needs it. Raising the floor alone is not a fix (dependency freshness section of AGENTS.md). Reviewed 2026-11-18."
     },
     "ruff": {
       "deferredLatest": "0.17.4",
